@@ -5,191 +5,136 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sipp - Your Pixels, Your Identity</title>
 <script src="https://cdn.tailwindcss.com"></script>
-
 <style>
-body { margin: 0; padding: 0; }
-.pixelated {
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-}
+body { margin:0; padding:0; font-family:sans-serif; }
+.pixelated { image-rendering: pixelated; image-rendering:-moz-crisp-edges; image-rendering:crisp-edges; }
+.fact { font-size:0.8rem; color:#4c1d95; }
 </style>
 </head>
-
 <body>
-<div class="min-h-screen bg-gradient-to-br from-yellow-200 via-pink-200 to-purple-300 flex items-center justify-center p-4">
+<div id="app" class="min-h-screen bg-gradient-to-br from-yellow-200 via-pink-200 to-purple-300 flex items-center justify-center p-4">
+<div class="max-w-2xl w-full bg-white/20 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/30 text-center">
+<h1 class="text-5xl font-bold text-purple-900 mb-2">Sipp</h1>
+<p class="text-purple-800 italic text-lg mb-6">Your pixels, your identity</p>
 
-<div class="max-w-2xl w-full bg-white/20 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/30">
-
-<!-- Header -->
-<div class="text-center mb-6">
-<h1 class="text-5xl font-bold text-purple-900 mb-1">Sipp</h1>
-<p class="text-purple-800 italic text-lg">Your pixels, your identity</p>
+<!-- Step 1: Connect -->
+<div id="stepConnect" class="flex flex-col items-center space-y-6">
+<button id="connectSolflareBtn" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+Connect Solflare Wallet</button>
+<div id="walletStatus" class="text-sm text-yellow-800 mt-2"></div>
 </div>
 
-<!-- NOT CONNECTED -->
-<div id="notConnected" class="flex flex-col items-center space-y-6">
-<button id="connectSolflareBtn"
-class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-lg hover:scale-105 transition">
-Connect Solflare Wallet
-</button>
-<p id="walletStatus" class="text-sm"></p>
-</div>
-
-<!-- CONNECTED -->
-<div id="connected" class="space-y-6 hidden">
-
+<!-- Step 2: Reveal / Show Sipp -->
+<div id="stepReveal" class="hidden space-y-6">
 <div class="bg-white/10 rounded-lg p-4 border border-white/20">
-<p class="text-sm text-purple-800 mb-1">Your Wallet</p>
-<p id="walletAddress" class="text-purple-900 font-mono text-sm break-all"></p>
+<p>Sipp ID: <span id="sippId" class="font-mono"></span></p>
+<p>Origin: Wallet-bound</p>
+<p>Status: Unchanged</p>
 </div>
 
 <div class="flex flex-col items-center space-y-4">
-
+<div class="bg-white/10 p-6 rounded-xl border-4 border-white/20 shadow-2xl">
 <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
+</div>
 
-<div id="downloadLinkContainer" class="hidden w-full bg-white/10 rounded-lg p-4 border border-white/20">
-<p class="text-sm text-purple-800 mb-2 font-semibold">Your Download Link</p>
+<div id="sippFacts" class="flex flex-col gap-1"></div>
+
+<button id="claimBtn" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
+Claim Sipp
+</button>
+
+<div id="downloadLinkContainer" class="w-full bg-white/10 rounded-lg p-4 border border-white/20 hidden">
+<p class="text-sm text-purple-800 mb-2 font-semibold">Your NFT Download Link:</p>
 <div class="flex gap-2">
-<input id="downloadLinkInput" readonly
-class="flex-1 px-3 py-2 bg-white/60 rounded text-xs font-mono"/>
-<button id="copyLinkBtn"
-class="px-4 py-2 bg-purple-500 text-white rounded">Copy</button>
+<input id="downloadLinkInput" type="text" readonly
+class="flex-1 px-3 py-2 bg-white/50 rounded border border-purple-300 text-purple-900 font-mono text-xs break-all" />
+<button id="copyLinkBtn" class="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded transition-all duration-200">
+Copy</button>
 </div>
-<p class="text-xs text-purple-700 mt-2">
-📋 Paste this link into Chrome or Safari
-</p>
+<p class="text-xs text-purple-700 mt-2">📋 Copy this link and paste it in Chrome/Safari to download your Sipp!</p>
 </div>
-
-<button id="downloadBtn"
-class="px-6 py-3 bg-green-500 text-white rounded-lg hover:scale-105 transition">
-Generate Download Link
-</button>
-
-<button id="regenerateBtn" class="text-sm underline text-purple-800">
-Regenerate ($0.5)
-</button>
-
-<button id="disconnectBtn"
-class="px-6 py-3 bg-red-500 text-white rounded-lg hover:scale-105 transition">
-Disconnect
-</button>
-
 </div>
 </div>
 </div>
 </div>
 
 <script>
+// ---------------- Wallet & Claim
 let walletAddress = null;
+let sippClaimed = false;
 
-/* Detect Solflare */
-window.onload = () => {
-const status = document.getElementById("walletStatus");
-if (window.solflare) {
-status.textContent = "✅ Solflare detected";
-status.className = "text-green-700";
-} else {
-status.textContent = "⚠️ Install Solflare wallet";
-status.className = "text-red-700";
-}
-};
+window.addEventListener('load',()=>{
+const statusEl=document.getElementById('walletStatus');
+if(!window.solflare){statusEl.textContent='⚠️ Solflare wallet not detected. Install extension.';statusEl.classList.add('text-red-700');} 
+else{statusEl.textContent='✅ Solflare detected! Click to connect.';statusEl.classList.add('text-green-700');}});
 
-/* Connect Wallet */
-async function connectSolflare() {
-if (!window.solflare) {
-window.open("https://solflare.com", "_blank");
-return;
-}
-await window.solflare.connect();
-walletAddress = window.solflare.publicKey.toString();
+async function connectSolflare(){
+if(!window.solflare){alert('Install Solflare extension!'); window.open('https://solflare.com/','_blank'); return;}
+try{await window.solflare.connect();
+if(window.solflare.publicKey){walletAddress=window.solflare.publicKey.toString(); checkClaim(walletAddress);}
+else alert('Failed to get wallet address');} catch(e){console.error(e); alert('Failed to connect');}}
 
-document.getElementById("walletAddress").textContent = walletAddress;
-document.getElementById("notConnected").classList.add("hidden");
-document.getElementById("connected").classList.remove("hidden");
+function checkClaim(address){
+sippClaimed=localStorage.getItem('sippClaim_'+address)==='true';
+showRevealStep();}
 
+// ---------------- Reveal Step
+function showRevealStep(){
+document.getElementById('stepConnect').style.display='none';
+document.getElementById('stepReveal').style.display='block';
+const sippId='Sipp #'+walletAddress.slice(2,6).toUpperCase();
+document.getElementById('sippId').textContent=sippId;
 generatePixelArt(walletAddress);
-}
+generateFacts(walletAddress);
+if(sippClaimed){document.getElementById('claimBtn').disabled=true; document.getElementById('claimBtn').textContent='Already Claimed'; generateDownloadLink();}}
 
-/* Disconnect */
-function disconnectWallet() {
-walletAddress = null;
-document.getElementById("connected").classList.add("hidden");
-document.getElementById("notConnected").classList.remove("hidden");
-}
+document.getElementById('claimBtn').addEventListener('click',()=>{
+if(!walletAddress) return alert('Connect wallet first.');
+localStorage.setItem('sippClaim_'+walletAddress,'true'); sippClaimed=true;
+document.getElementById('claimBtn').disabled=true; document.getElementById('claimBtn').textContent='Claimed!';
+generateDownloadLink();});
 
-/* Simple seeded RNG */
-function hashSeed(str) {
-let h = 0;
-for (let i = 0; i < str.length; i++) {
-h = str.charCodeAt(i) + ((h << 5) - h);
-}
-return Math.abs(h);
-}
+// ---------------- Facts
+class Random{constructor(seed){this.seed=seed;} next(){this.seed=(this.seed*9301+49297)%233280; return this.seed/233280;} pick(arr){return arr[Math.floor(this.next()*arr.length)];}}
+function hashCode(str){let h=0; for(let i=0;i<str.length;i++){h=str.charCodeAt(i)+((h<<5)-h);} return Math.abs(h);}
+function generateFacts(address){
+const rng=new Random(hashCode(address));
+const facts=[]; const possibleFacts=['Loves chaos','Collector of hats','Pet: PixelCat','Master of memes','Colorful aura','Speaks in emojis','Sneaker fanatic','Lucky number 7','Fearless explorer','Secret chef','Dances in code'];
+while(facts.length<3){const f=rng.pick(possibleFacts); if(!facts.includes(f)) facts.push(f);}
+document.getElementById('sippFacts').innerHTML=facts.map(f=>`<p class="fact">• ${f}</p>`).join('');}
 
-/* Generate Pixel Art */
-function generatePixelArt(seedStr) {
-const canvas = document.getElementById("pixelCanvas");
-const ctx = canvas.getContext("2d");
-const seed = hashSeed(seedStr);
-const size = 24;
-const px = 16;
-
-canvas.width = size * px;
-canvas.height = size * px;
-
-ctx.fillStyle = `hsl(${seed % 360},70%,60%)`;
-ctx.fillRect(0,0,canvas.width,canvas.height);
-
-for (let y = 6; y < 16; y++) {
-for (let x = 7; x < 17; x++) {
-ctx.fillStyle = `hsl(${(seed+x*y)%360},60%,50%)`;
-ctx.fillRect(x*px,y*px,px,px);
-}
-}
-}
-
-/* Convert dataURL to Blob */
-function dataURLtoBlob(dataurl) {
-const arr = dataurl.split(",");
-const mime = arr[0].match(/:(.*?);/)[1];
-const bstr = atob(arr[1]);
-let n = bstr.length;
-const u8 = new Uint8Array(n);
-while(n--) u8[n] = bstr.charCodeAt(n);
-return new Blob([u8], { type: mime });
-}
-
-/* Generate Download */
-function downloadNFT() {
-const canvas = document.getElementById("pixelCanvas");
-const dataURL = canvas.toDataURL("image/png");
-const blob = dataURLtoBlob(dataURL);
-const url = URL.createObjectURL(blob);
-
-document.getElementById("downloadLinkInput").value = url;
-document.getElementById("downloadLinkContainer").classList.remove("hidden");
-
-if (!/Solflare/i.test(navigator.userAgent)) {
-window.open(url, "_blank");
-} else {
-alert("Open link in Chrome or Safari");
-}
-}
-
-/* Copy */
-function copyLink() {
-const input = document.getElementById("downloadLinkInput");
-input.select();
-document.execCommand("copy");
-}
-
-/* Events */
-connectSolflareBtn.onclick = connectSolflare;
-disconnectBtn.onclick = disconnectWallet;
-downloadBtn.onclick = downloadNFT;
-copyLinkBtn.onclick = copyLink;
-regenerateBtn.onclick = () => generatePixelArt(walletAddress);
+// ---------------- Pixel Art Engine
+function generatePixelArt(address){
+const canvas=document.getElementById('pixelCanvas'); const ctx=canvas.getContext('2d'); const grid=24, px=16; canvas.width=canvas.height=grid*px; ctx.clearRect(0,0,canvas.width,canvas.height);
+const rng=new Random(hashCode(address));
+// Background
+const hue=rng.next()*360;
+ctx.fillStyle=`hsl(${hue},70%,60%)`; ctx.fillRect(0,0,canvas.width,canvas.height);
+// Head
+const skinColors=['#8d5524','#c68642','#f1c27d','#ffdbac','#2ecc71','#ff00ff']; const skin=rng.pick(skinColors);
+for(let y=6;y<14;y++) for(let x=8;x<16;x++) ctx.fillStyle=skin, ctx.fillRect(x*px,y*px,px,px);
+// Hair
+const hairColors=['#000','#800000','#ff0','#0ff','#f0f','#c90']; const hair=rng.pick(hairColors);
+for(let x=7;x<17;x++){if(rng.next()<0.5) ctx.fillStyle=hair, ctx.fillRect(x*px,4*px,px,px);}
+for(let x=9;x<15;x++){if(rng.next()<0.5) ctx.fillStyle=hair, ctx.fillRect(x*px,5*px,px,px);}
+// Eyes
+ctx.fillStyle='#000'; ctx.fillRect(10*px,8*px,px,px); ctx.fillRect(13*px,8*px,px,px);
+// Mouth
+ctx.fillStyle='#900'; ctx.fillRect(11*px,11*px,2*px,px);
+// Accessories (chance)
+if(rng.next()<0.4){ctx.fillStyle='#ff0'; ctx.fillRect(9*px,6*px,px,px); ctx.fillRect(14*px,6*px,px,px);}}
+    
+// ---------------- Download
+function dataURLtoBlob(dataurl){const arr=dataurl.split(','), mime=arr[0].match(/:(.*?);/)[1]; const bstr=atob(arr[1]); let n=bstr.length; const u8arr=new Uint8Array(n); while(n--){u8arr[n]=bstr.charCodeAt(n);} return new Blob([u8arr],{type:mime});}
+function generateDownloadLink(){
+const canvas=document.getElementById('pixelCanvas'); const linkContainer=document.getElementById('downloadLinkContainer'); const linkInput=document.getElementById('downloadLinkInput');
+const url=URL.createObjectURL(dataURLtoBlob(canvas.toDataURL('image/png'))); linkInput.value=url; linkContainer.style.display='block';}
+document.getElementById('copyLinkBtn').addEventListener('click',()=>{
+const input=document.getElementById('downloadLinkInput'); input.select(); input.setSelectionRange(0,99999); document.execCommand('copy');
+const btn=document.getElementById('copyLinkBtn'); const orig=btn.textContent; btn.textContent='✓ Copied!'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-purple-500');
+setTimeout(()=>{btn.textContent=orig; btn.classList.remove('bg-green-500'); btn.classList.add('bg-purple-500');},2000);
+});
+document.getElementById('connectSolflareBtn').addEventListener('click',connectSolflare);
 </script>
-
 </body>
 </html>
