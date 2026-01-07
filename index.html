@@ -1,70 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wallet Pixel Art</title>
-<style>
-  body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-  #canvas { border: 2px solid #333; margin-top: 20px; }
-  button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solflare Wallet Pixel NFT Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .pixelated {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+    </style>
 </head>
 <body>
-<h1>Wallet Pixel NFT Art</h1>
-<button id="connectWallet">Connect Solflare Wallet</button>
-<canvas id="canvas" width="200" height="200"></canvas>
+    <div id="app" class="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+        <div class="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-white mb-2">
+                    Wallet Pixel NFT Generator
+                </h1>
+                <p class="text-purple-200">
+                    Connect your Solflare wallet to generate unique pixel art
+                </p>
+            </div>
 
-<script type="module">
-import { SolflareWalletAdapter } from "https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-wallets@0.19.10/dist/index.browser.js";
-import { WalletAdapterNetwork } from "https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-base@0.9.7/dist/index.browser.js";
+            <!-- Not Connected State -->
+            <div id="notConnected" class="flex flex-col items-center space-y-6">
+                <div class="w-32 h-32 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                    <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                    </svg>
+                </div>
+                
+                <button
+                    id="connectBtn"
+                    class="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                >
+                    Connect Solflare Wallet
+                </button>
 
-// Canvas setup
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+                <p class="text-sm text-purple-300">
+                    Don't have Solflare? 
+                    <a 
+                        href="https://solflare.com/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        class="text-blue-300 hover:text-blue-200 underline"
+                    >
+                        Get it here
+                    </a>
+                </p>
+            </div>
 
-let walletAddress = "";
+            <!-- Connected State -->
+            <div id="connected" class="space-y-6" style="display: none;">
+                <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <p class="text-sm text-purple-300 mb-1">Connected Wallet</p>
+                    <p id="walletAddress" class="text-white font-mono text-sm break-all"></p>
+                </div>
 
-// Initialize wallet adapter
-const solflare = new SolflareWalletAdapter({ network: WalletAdapterNetwork.Devnet, provider: window.solflare });
+                <div class="flex flex-col items-center space-y-4">
+                    <div class="bg-white/10 p-6 rounded-xl border-4 border-white/20 shadow-2xl">
+                        <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
+                    </div>
 
-const walletButton = document.getElementById("connectWallet");
-walletButton.addEventListener("click", async () => {
-    try {
-        await solflare.connect();
-        walletAddress = solflare.publicKey.toString();
-        alert("Connected wallet: " + walletAddress);
-        generatePixelArt(walletAddress);
-    } catch (err) {
-        console.error(err);
-        alert("Failed to connect wallet. Make sure Solflare extension/app is installed.");
-    }
-});
+                    <div class="flex gap-4">
+                        <button
+                            id="downloadBtn"
+                            class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                        >
+                            Download NFT
+                        </button>
+                        
+                        <button
+                            id="disconnectBtn"
+                            class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                        >
+                            Disconnect
+                        </button>
+                    </div>
 
-// Simple deterministic hash function from string
-function hashStringToNumbers(str, max) {
-    const hash = Array.from(str).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return Array.from(str).map(c => c.charCodeAt(0) % max);
-}
+                    <button
+                        id="regenerateBtn"
+                        class="text-sm text-purple-300 hover:text-purple-200 underline"
+                    >
+                        Regenerate Art
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-// Generate pixel art
-function generatePixelArt(walletAddr) {
-    const size = 8; // 8x8 grid
-    const pixelSize = canvas.width / size;
-    const numbers = hashStringToNumbers(walletAddr, 255);
+    <script>
+        let walletAddress = null;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw pixels
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const n = numbers[(x + y) % numbers.length];
-            ctx.fillStyle = `rgb(${n}, ${255 - n}, ${n * 2 % 255})`;
-            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+        // Check if Solflare is installed
+        function isSolflareInstalled() {
+            return window.solflare && window.solflare.isSolflare;
         }
-    }
-}
-</script>
+
+        // Connect wallet
+        async function connectWallet() {
+            if (!isSolflareInstalled()) {
+                alert('Please install Solflare wallet extension first!');
+                window.open('https://solflare.com/', '_blank');
+                return;
+            }
+
+            try {
+                const resp = await window.solflare.connect();
+                walletAddress = resp.publicKey.toString();
+                document.getElementById('walletAddress').textContent = walletAddress;
+                
+                // Show connected state
+                document.getElementById('notConnected').style.display = 'none';
+                document.getElementById('connected').style.display = 'block';
+                
+                // Generate pixel art
+                generatePixelArt(walletAddress);
+            } catch (err) {
+                console.error('Connection failed:', err);
+                alert('Failed to connect wallet: ' + err.message);
+            }
+        }
+
+        // Disconnect wallet
+        function disconnectWallet() {
+            if (window.solflare) {
+                window.solflare.disconnect();
+            }
+            walletAddress = null;
+            
+            // Show not connected state
+            document.getElementById('notConnected').style.display = 'flex';
+            document.getElementById('connected').style.display = 'none';
+        }
+
+        // Generate pixel art from wallet address
+        function generatePixelArt(address) {
+            const canvas = document.getElementById('pixelCanvas');
+            const ctx = canvas.getContext('2d');
+            const gridSize = 16; // 16x16 pixel art
+            const pixelSize = 20; // Each pixel is 20x20 on canvas
+            
+            canvas.width = gridSize * pixelSize;
+            canvas.height = gridSize * pixelSize;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Convert address to hash for deterministic colors
+            let hash = 0;
+            for (let i = 0; i < address.length; i++) {
+                hash = address.charCodeAt(i) + ((hash << 5) - hash);
+            }
+
+            // Generate color palette from hash
+            const hue = Math.abs(hash) % 360;
+            const colors = [
+                `hsl(${hue}, 70%, 60%)`,
+                `hsl(${(hue + 30) % 360}, 70%, 50%)`,
+                `hsl(${(hue + 60) % 360}, 70%, 55%)`,
+                `hsl(${(hue + 90) % 360}, 70%, 45%)`,
+                `hsl(${(hue + 120) % 360}, 70%, 50%)`,
+            ];
+
+            // Generate pixel pattern from address
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    const index = y * gridSize + x;
+                    const charCode = address.charCodeAt(index % address.length);
+                    
+                    // Create symmetry for better aesthetics (mirror horizontally)
+                    const actualX = x < gridSize / 2 ? x : gridSize - 1 - x;
+                    const seed = (charCode + actualX + y) % 100;
+                    
+                    // Only draw pixel if seed meets threshold (creates pattern)
+                    if (seed > 30) {
+                        const colorIndex = (charCode + actualX + y) % colors.length;
+                        ctx.fillStyle = colors[colorIndex];
+                        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+                        
+                        // Add pixel border for retro look
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                        ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+                    }
+                }
+            }
+        }
+
+        // Download NFT
+        function downloadNFT() {
+            const canvas = document.getElementById('pixelCanvas');
+            const link = document.createElement('a');
+            link.download = `wallet-nft-${walletAddress.slice(0, 8)}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Event listeners
+        document.getElementById('connectBtn').addEventListener('click', connectWallet);
+        document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
+        document.getElementById('downloadBtn').addEventListener('click', downloadNFT);
+        document.getElementById('regenerateBtn').addEventListener('click', () => {
+            if (walletAddress) {
+                generatePixelArt(walletAddress);
+            }
+        });
+    </script>
 </body>
 </html>
