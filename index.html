@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solflare Wallet Pixel NFT Generator</title>
+    <title>Solana Wallet Pixel NFT Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -25,7 +25,7 @@
                     Wallet Pixel NFT Generator
                 </h1>
                 <p class="text-purple-200">
-                    Connect your Solflare wallet to generate unique pixel art
+                    Connect your Solana wallet to generate unique pixel art
                 </p>
             </div>
 
@@ -37,22 +37,42 @@
                     </svg>
                 </div>
                 
-                <button
-                    id="connectBtn"
-                    class="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                >
-                    Connect Solflare Wallet
-                </button>
+                <div class="flex flex-col gap-3 w-full max-w-sm">
+                    <button
+                        id="connectSolflareBtn"
+                        class="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                    >
+                        Connect Solflare Wallet
+                    </button>
+
+                    <button
+                        id="connectPhantomBtn"
+                        class="px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                    >
+                        Connect Phantom Wallet
+                    </button>
+                </div>
+
+                <div id="walletStatus" class="text-sm text-yellow-300"></div>
 
                 <p class="text-sm text-purple-300">
-                    Don't have Solflare? 
+                    Don't have a wallet? Get 
                     <a 
                         href="https://solflare.com/" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         class="text-blue-300 hover:text-blue-200 underline"
                     >
-                        Get it here
+                        Solflare
+                    </a>
+                    or
+                    <a 
+                        href="https://phantom.app/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        class="text-blue-300 hover:text-blue-200 underline"
+                    >
+                        Phantom
                     </a>
                 </p>
             </div>
@@ -60,7 +80,7 @@
             <!-- Connected State -->
             <div id="connected" class="space-y-6" style="display: none;">
                 <div class="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <p class="text-sm text-purple-300 mb-1">Connected Wallet</p>
+                    <p class="text-sm text-purple-300 mb-1">Connected Wallet (<span id="walletType"></span>)</p>
                     <p id="walletAddress" class="text-white font-mono text-sm break-all"></p>
                 </div>
 
@@ -98,43 +118,116 @@
 
     <script>
         let walletAddress = null;
+        let currentProvider = null;
 
-        // Check if Solflare is installed
-        function isSolflareInstalled() {
-            return window.solflare && window.solflare.isSolflare;
+        // Wait for wallet providers to load
+        function waitForWallet(providerName, maxAttempts = 50) {
+            return new Promise((resolve) => {
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    if (providerName === 'solflare' && window.solflare) {
+                        clearInterval(checkInterval);
+                        resolve(window.solflare);
+                    } else if (providerName === 'phantom' && window.solana && window.solana.isPhantom) {
+                        clearInterval(checkInterval);
+                        resolve(window.solana);
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        resolve(null);
+                    }
+                }, 100);
+            });
         }
 
-        // Connect wallet
-        async function connectWallet() {
-            if (!isSolflareInstalled()) {
-                alert('Please install Solflare wallet extension first!');
+        // Check wallet status on load
+        window.addEventListener('load', async () => {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const hasSolflare = window.solflare;
+            const hasPhantom = window.solana && window.solana.isPhantom;
+            
+            const statusEl = document.getElementById('walletStatus');
+            if (!hasSolflare && !hasPhantom) {
+                statusEl.textContent = '⚠️ No Solana wallet detected. Please install Solflare or Phantom.';
+            } else if (hasSolflare && hasPhantom) {
+                statusEl.textContent = '✅ Both Solflare and Phantom detected!';
+                statusEl.classList.remove('text-yellow-300');
+                statusEl.classList.add('text-green-300');
+            } else if (hasSolflare) {
+                statusEl.textContent = '✅ Solflare wallet detected!';
+                statusEl.classList.remove('text-yellow-300');
+                statusEl.classList.add('text-green-300');
+            } else if (hasPhantom) {
+                statusEl.textContent = '✅ Phantom wallet detected!';
+                statusEl.classList.remove('text-yellow-300');
+                statusEl.classList.add('text-green-300');
+            }
+        });
+
+        // Connect to Solflare
+        async function connectSolflare() {
+            const provider = await waitForWallet('solflare');
+            
+            if (!provider) {
+                alert('Solflare wallet not found! Please install the Solflare browser extension.');
                 window.open('https://solflare.com/', '_blank');
                 return;
             }
 
             try {
-                const resp = await window.solflare.connect();
+                const resp = await provider.connect();
                 walletAddress = resp.publicKey.toString();
-                document.getElementById('walletAddress').textContent = walletAddress;
-                
-                // Show connected state
-                document.getElementById('notConnected').style.display = 'none';
-                document.getElementById('connected').style.display = 'block';
-                
-                // Generate pixel art
-                generatePixelArt(walletAddress);
+                currentProvider = provider;
+                document.getElementById('walletType').textContent = 'Solflare';
+                showConnectedState();
             } catch (err) {
-                console.error('Connection failed:', err);
-                alert('Failed to connect wallet: ' + err.message);
+                console.error('Solflare connection failed:', err);
+                alert('Failed to connect to Solflare: ' + err.message);
             }
+        }
+
+        // Connect to Phantom
+        async function connectPhantom() {
+            const provider = await waitForWallet('phantom');
+            
+            if (!provider) {
+                alert('Phantom wallet not found! Please install the Phantom browser extension.');
+                window.open('https://phantom.app/', '_blank');
+                return;
+            }
+
+            try {
+                const resp = await provider.connect();
+                walletAddress = resp.publicKey.toString();
+                currentProvider = provider;
+                document.getElementById('walletType').textContent = 'Phantom';
+                showConnectedState();
+            } catch (err) {
+                console.error('Phantom connection failed:', err);
+                alert('Failed to connect to Phantom: ' + err.message);
+            }
+        }
+
+        // Show connected state
+        function showConnectedState() {
+            document.getElementById('walletAddress').textContent = walletAddress;
+            document.getElementById('notConnected').style.display = 'none';
+            document.getElementById('connected').style.display = 'block';
+            generatePixelArt(walletAddress);
         }
 
         // Disconnect wallet
         function disconnectWallet() {
-            if (window.solflare) {
-                window.solflare.disconnect();
+            if (currentProvider && currentProvider.disconnect) {
+                try {
+                    currentProvider.disconnect();
+                } catch (err) {
+                    console.log('Disconnect error:', err);
+                }
             }
             walletAddress = null;
+            currentProvider = null;
             
             // Show not connected state
             document.getElementById('notConnected').style.display = 'flex';
@@ -145,22 +238,19 @@
         function generatePixelArt(address) {
             const canvas = document.getElementById('pixelCanvas');
             const ctx = canvas.getContext('2d');
-            const gridSize = 16; // 16x16 pixel art
-            const pixelSize = 20; // Each pixel is 20x20 on canvas
+            const gridSize = 16;
+            const pixelSize = 20;
             
             canvas.width = gridSize * pixelSize;
             canvas.height = gridSize * pixelSize;
 
-            // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Convert address to hash for deterministic colors
             let hash = 0;
             for (let i = 0; i < address.length; i++) {
                 hash = address.charCodeAt(i) + ((hash << 5) - hash);
             }
 
-            // Generate color palette from hash
             const hue = Math.abs(hash) % 360;
             const colors = [
                 `hsl(${hue}, 70%, 60%)`,
@@ -170,23 +260,19 @@
                 `hsl(${(hue + 120) % 360}, 70%, 50%)`,
             ];
 
-            // Generate pixel pattern from address
             for (let y = 0; y < gridSize; y++) {
                 for (let x = 0; x < gridSize; x++) {
                     const index = y * gridSize + x;
                     const charCode = address.charCodeAt(index % address.length);
                     
-                    // Create symmetry for better aesthetics (mirror horizontally)
                     const actualX = x < gridSize / 2 ? x : gridSize - 1 - x;
                     const seed = (charCode + actualX + y) % 100;
                     
-                    // Only draw pixel if seed meets threshold (creates pattern)
                     if (seed > 30) {
                         const colorIndex = (charCode + actualX + y) % colors.length;
                         ctx.fillStyle = colors[colorIndex];
                         ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
                         
-                        // Add pixel border for retro look
                         ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
                         ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
                     }
@@ -204,7 +290,8 @@
         }
 
         // Event listeners
-        document.getElementById('connectBtn').addEventListener('click', connectWallet);
+        document.getElementById('connectSolflareBtn').addEventListener('click', connectSolflare);
+        document.getElementById('connectPhantomBtn').addEventListener('click', connectPhantom);
         document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
         document.getElementById('downloadBtn').addEventListener('click', downloadNFT);
         document.getElementById('regenerateBtn').addEventListener('click', () => {
