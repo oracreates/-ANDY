@@ -3,181 +3,191 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIPP</title>
+<title>Sipp - Weird Pixel PFP Generator</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-    body { margin:0; padding:0; font-family:sans-serif; background:#0B0F1A; }
-    .pixelated { image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; }
-    button { cursor:pointer; }
+  body { margin:0; padding:0; }
+  .pixelated { image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; }
 </style>
 </head>
-<body>
-<div id="app" class="min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
-        <div class="text-center mb-6">
-            <h1 class="text-4xl font-bold text-[#EAEAF0] mb-2">SIPP</h1>
-            <p class="text-[#A1A1B3]">Wallet-signed pixel identity</p>
-        </div>
+<body class="bg-yellow-50 flex items-center justify-center min-h-screen p-4">
+<div id="app" class="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
+  <div class="text-center mb-6">
+    <h1 class="text-3xl font-bold text-purple-700 mb-2">Sipp</h1>
+    <p class="text-purple-500">Connect your wallet, pay $1, and get your weird collectible pixel PFP!</p>
+  </div>
 
-        <!-- Not connected -->
-        <div id="notConnected" class="flex flex-col items-center space-y-4">
-            <button id="connectSolflareBtn" class="px-8 py-4 bg-[#7C5CFF] text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
-                Connect Solflare Wallet
-            </button>
-            <div id="walletStatus" class="text-sm text-yellow-300 mt-2"></div>
-        </div>
+  <div id="notConnected" class="flex flex-col items-center gap-4">
+    <button id="connectSolflareBtn" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+      Connect Solflare Wallet
+    </button>
+    <div id="walletStatus" class="text-sm text-yellow-700"></div>
+  </div>
 
-        <!-- Connected -->
-        <div id="connected" class="space-y-6" style="display:none;">
-            <p class="text-[#A1A1B3]">Connected Wallet: <span id="walletAddress" class="font-mono text-white"></span></p>
-            <button id="payBtn" class="px-6 py-3 bg-[#4DEEEA] text-black font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
-                Create SIPP ($1)
-            </button>
-
-            <div id="pixelContainer" class="flex flex-col items-center space-y-4" style="display:none;">
-                <div class="bg-white/10 p-6 rounded-xl border-4 border-white/20 shadow-2xl">
-                    <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
-                </div>
-                <div class="flex gap-4">
-                    <button id="downloadBtn" class="px-6 py-3 bg-[#A6FF00] text-black font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                        Download PFP
-                    </button>
-                    <button id="regenerateBtn" class="px-6 py-3 bg-[#FF7AD9] text-black font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                        Regenerate ($0.5)
-                    </button>
-                </div>
-                <p class="text-[#A1A1B3] text-sm mt-2">Traits: <span id="traitList"></span></p>
-            </div>
-        </div>
+  <div id="connected" class="space-y-4" style="display:none;">
+    <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+      <p class="text-sm text-purple-700 mb-1">Connected Wallet: <span id="walletAddress" class="font-mono"></span></p>
+      <p id="paymentStatus" class="text-sm text-green-600">Pay $1 to reveal your Sipp NFT</p>
+      <button id="payBtn" class="px-6 py-3 bg-indigo-500 text-white rounded-lg shadow-lg hover:bg-indigo-600">Pay $1</button>
     </div>
+
+    <div id="nftContainer" class="flex flex-col items-center space-y-4" style="display:none;">
+      <canvas id="pixelCanvas" class="rounded-lg pixelated bg-white border-2 border-purple-300"></canvas>
+      <div class="flex gap-4">
+        <button id="downloadBtn" class="px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg hover:bg-green-600">Download NFT</button>
+        <button id="regenerateBtn" class="px-6 py-3 bg-yellow-400 text-white rounded-lg shadow-lg hover:bg-yellow-500">Regenerate Rare Traits ($0.5)</button>
+      </div>
+    </div>
+
+    <button id="disconnectBtn" class="text-sm text-red-500 hover:text-red-700 mt-4 underline">Disconnect Wallet</button>
+  </div>
 </div>
 
 <script>
 let walletAddress = null;
-const officialWallet = "YOUR_SIPP_WALLET_ADDRESS_HERE"; // Replace with your wallet
-const gridSize = 16;
-const pixelSize = 20;
+let currentProvider = null;
 
-// traits definition
-const traitPool = {
-    eyes: ["Normal","Laser","Angry","Sleepy","Heart","Cyclops","Glitch"],
-    mouth: ["Smile","Frown","Grin","Ooo","Tongue","Snarl","Weird"],
-    hair: ["None","Spiky","Afro","Mohawk","Long","Short","Rainbow"],
-    accessory: ["None","Hat","Glasses","Earring","Crown","Headphone","Halo"],
-    background: ["Blue","Purple","Red","Green","Yellow","Glitch","Neon"],
-    rare: ["Golden Glow","Pixel Halo","Glitch Aura","Rainbow Spark"]
+// Simple hash function for deterministic traits
+function hashCode(str) {
+  let hash = 0;
+  for (let i=0;i<str.length;i++){
+    hash = str.charCodeAt(i) + ((hash<<5)-hash);
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+// Layered traits
+const traitOptions = {
+  head: ["round","square","triangle","alien","monster","robot","floating-eye"],
+  eyes: ["normal","angry","glitch","big","mismatched","tiny","glowing"],
+  mouth: ["smile","frown","grin","teeth","tentacle","shock"],
+  hair: ["spiky","bald","horns","halo","helmet","mohawk","antenna"],
+  accessory: ["monocle","necklace","earring","goggles","floating-pet","tiny-rocket","chain"],
+  background: ["gradient-purple","gradient-pink","halo","glow","sparkle","abstract","rainbow"]
 };
 
-// simple hash from string
-function hashCode(str) {
-    let hash=0;
-    for(let i=0;i<str.length;i++){
-        hash = str.charCodeAt(i) + ((hash<<5)-hash);
-        hash |=0;
-    }
-    return Math.abs(hash);
+// Deterministic selection
+function pickTrait(wallet, traitArray, offset=0){
+  const seed = hashCode(wallet + offset);
+  return traitArray[seed % traitArray.length];
 }
 
-// pick traits deterministically from wallet
-function pickTraits(addr){
-    const h = hashCode(addr);
-    return {
-        eyes: traitPool.eyes[h%traitPool.eyes.length],
-        mouth: traitPool.mouth[(h>>2)%traitPool.mouth.length],
-        hair: traitPool.hair[(h>>4)%traitPool.hair.length],
-        accessory: traitPool.accessory[(h>>6)%traitPool.accessory.length],
-        background: traitPool.background[(h>>8)%traitPool.background.length],
-        rare: traitPool.rare[(h>>10)%traitPool.rare.length]
-    };
+// Generate weird pixel head-to-shoulders
+function generatePixelNFT(wallet, rare=false){
+  const canvas = document.getElementById("pixelCanvas");
+  const ctx = canvas.getContext("2d");
+  const size = 32;
+  const scale = 10;
+  canvas.width = size*scale;
+  canvas.height = size*scale;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Pick traits
+  let head = pickTrait(wallet, traitOptions.head, 1);
+  let eyes = pickTrait(wallet, traitOptions.eyes, 2);
+  let mouth = pickTrait(wallet, traitOptions.mouth, 3);
+  let hair = pickTrait(wallet, traitOptions.hair, 4);
+  let accessory = pickTrait(wallet, traitOptions.accessory, 5);
+  let background = pickTrait(wallet, traitOptions.background, 6);
+
+  // Rare traits randomization if requested
+  if(rare){
+    const rareChance = Math.floor(Math.random()*traitOptions.accessory.length);
+    accessory = traitOptions.accessory[rareChance];
+  }
+
+  // Draw simple pixelized head-to-shoulders character
+  // Background
+  ctx.fillStyle = background.includes("gradient") ? "pink" : background.includes("halo") ? "#ffe600" : "#ddd";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Head
+  ctx.fillStyle = head.includes("alien") ? "#7fff00" : head.includes("monster") ? "#ff5500" : "#f5c9a0";
+  ctx.fillRect(8*scale,0*scale,16*scale,16*scale);
+
+  // Eyes
+  ctx.fillStyle = eyes.includes("glow") ? "#00ffff" : "#000";
+  ctx.fillRect(10*scale,4*scale,2*scale,2*scale);
+  ctx.fillRect(20*scale,4*scale,2*scale,2*scale);
+
+  // Mouth
+  ctx.fillStyle = mouth.includes("teeth") ? "#fff" : "#000";
+  ctx.fillRect(14*scale,12*scale,4*scale,2*scale);
+
+  // Hair / accessories
+  ctx.fillStyle = hair.includes("halo") ? "#ffff00" : "#222";
+  ctx.fillRect(8*scale,0,16*scale,4*scale);
+
+  // Shoulder / chest
+  ctx.fillStyle = "#888";
+  ctx.fillRect(4*scale,16*scale,24*scale,12*scale);
+
+  // Accessory overlay
+  if(accessory.includes("monocle")){
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(10*scale,6*scale,3*scale,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  return canvas;
 }
 
-// generate pixel art
-function generatePixelArt(addr){
-    const canvas = document.getElementById("pixelCanvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = gridSize*pixelSize;
-    canvas.height = gridSize*pixelSize;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    const traits = pickTraits(addr);
-    document.getElementById("traitList").textContent = `${traits.eyes}, ${traits.mouth}, ${traits.hair}, ${traits.accessory}, ${traits.background}${traits.rare?" • "+traits.rare:""}`;
-
-    // simple color mapping per trait
-    const colorMap = {
-        "Normal":"#E0E0E0","Laser":"#FF0000","Angry":"#880000","Sleepy":"#888888","Heart":"#FF69B4","Cyclops":"#00FFFF","Glitch":"#FF00FF",
-        "Smile":"#FFFFFF","Frown":"#AAAAAA","Grin":"#FFD700","Ooo":"#FFA500","Tongue":"#FF69B4","Snarl":"#880000","Weird":"#44FF44",
-        "None":"#0B0F1A","Spiky":"#FFCC00","Afro":"#663300","Mohawk":"#FF00FF","Long":"#8800FF","Short":"#4444FF","Rainbow":"#FF77FF",
-        "Hat":"#00FFFF","Glasses":"#FFFFFF","Earring":"#FFD700","Crown":"#FFCC00","Headphone":"#AA00FF","Halo":"#FFFF00",
-        "Blue":"#1E3A8A","Purple":"#7C5CFF","Red":"#DC2626","Green":"#16A34A","Yellow":"#FACC15","Glitch":"#FF00FF","Neon":"#4DEEEA",
-        "Golden Glow":"#FFD700","Pixel Halo":"#FFFF00","Glitch Aura":"#FF00FF","Rainbow Spark":"#FF77FF"
-    };
-
-    for(let y=0;y<gridSize;y++){
-        for(let x=0;x<gridSize;x++){
-            // random-ish based on wallet + position
-            const seed = hashCode(addr + x + "," + y) % 100;
-            if(seed>30){
-                let color = colorMap[traits.background];
-                if(seed>70) color = colorMap[traits.rare]; 
-                ctx.fillStyle = color;
-                ctx.fillRect(x*pixelSize,y*pixelSize,pixelSize,pixelSize);
-                ctx.strokeStyle='rgba(0,0,0,0.05)';
-                ctx.strokeRect(x*pixelSize,y*pixelSize,pixelSize,pixelSize);
-            }
-        }
-    }
-}
-
-// connect solflare
+// Connect Solflare
 async function connectSolflare(){
+  try{
     if(!window.solflare){
-        alert("Install Solflare!");
-        window.open("https://solflare.com","_blank");
-        return;
+      alert("Install Solflare wallet!");
+      window.open("https://solflare.com/","_blank");
+      return;
     }
     await window.solflare.connect();
     walletAddress = window.solflare.publicKey.toString();
+    currentProvider = window.solflare;
     document.getElementById("walletAddress").textContent = walletAddress;
     document.getElementById("notConnected").style.display="none";
     document.getElementById("connected").style.display="block";
+  } catch(e){console.error(e);}
 }
 
-// simulate $1 transaction
-async function pay(amount){
-    try{
-        if(!walletAddress) return alert("Connect wallet first");
-        const transaction = {
-            to: officialWallet,
-            lamports: amount*1000000000 // 1 SOL = 1e9 lamports; here we assume 1$=0.0003 SOL as example
-        };
-        // use Solflare requestTransfer or SystemProgram here
-        alert(`Simulated $${amount} transfer to SIPP wallet`);
-        return true;
-    }catch(e){ console.error(e); return false;}
+// Fake $1 payment for demo
+function payOneDollar(){
+  document.getElementById("paymentStatus").textContent="Payment received! Here’s your NFT:";
+  document.getElementById("nftContainer").style.display="flex";
+  generatePixelNFT(walletAddress);
 }
 
-// event listeners
+// Download NFT
+function downloadNFT(){
+  const canvas = document.getElementById("pixelCanvas");
+  const link=document.createElement("a");
+  link.href=canvas.toDataURL();
+  link.download=`sipp-nft-${walletAddress.slice(0,8)}.png`;
+  link.click();
+}
+
+// Regenerate rare traits
+function regenerateNFT(){
+  generatePixelNFT(walletAddress,true);
+}
+
+// Disconnect
+function disconnectWallet(){
+  if(currentProvider && currentProvider.disconnect) currentProvider.disconnect();
+  walletAddress=null;
+  currentProvider=null;
+  document.getElementById("notConnected").style.display="flex";
+  document.getElementById("connected").style.display="none";
+  document.getElementById("nftContainer").style.display="none";
+}
+
 document.getElementById("connectSolflareBtn").addEventListener("click",connectSolflare);
-document.getElementById("payBtn").addEventListener("click", async ()=>{
-    const paid = await pay(1);
-    if(paid){
-        document.getElementById("pixelContainer").style.display="flex";
-        generatePixelArt(walletAddress);
-    }
-});
-document.getElementById("regenerateBtn").addEventListener("click", async ()=>{
-    const paid = await pay(0.5);
-    if(paid){
-        generatePixelArt(walletAddress+"regen"+Math.random());
-    }
-});
-document.getElementById("downloadBtn").addEventListener("click",()=>{
-    const canvas = document.getElementById("pixelCanvas");
-    const link = document.createElement("a");
-    link.download = `SIPP-${walletAddress.slice(0,6)}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-});
+document.getElementById("payBtn").addEventListener("click",payOneDollar);
+document.getElementById("downloadBtn").addEventListener("click",downloadNFT);
+document.getElementById("regenerateBtn").addEventListener("click",regenerateNFT);
+document.getElementById("disconnectBtn").addEventListener("click",disconnectWallet);
 </script>
 </body>
 </html>
