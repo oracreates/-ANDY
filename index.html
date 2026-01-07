@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,7 +40,7 @@ body {
         <!-- Connected -->
         <div id="connected" class="space-y-6" style="display: none;">
             <div class="bg-white/10 rounded-lg p-4 border border-white/20">
-                <p class="text-sm text-purple-800 mb-1">Drop your Sipp</p>
+                <p class="text-sm text-purple-800 mb-1">Your Wallet</p>
                 <p id="walletAddress" class="text-purple-900 font-mono text-sm break-all"></p>
             </div>
 
@@ -48,9 +49,20 @@ body {
                     <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
                 </div>
 
+                <div id="downloadLinkContainer" class="w-full bg-white/10 rounded-lg p-4 border border-white/20" style="display: none;">
+                    <p class="text-sm text-purple-800 mb-2 font-semibold">Your NFT Download Link:</p>
+                    <div class="flex gap-2">
+                        <input id="downloadLinkInput" type="text" readonly class="flex-1 px-3 py-2 bg-white/50 rounded border border-purple-300 text-purple-900 font-mono text-xs break-all" />
+                        <button id="copyLinkBtn" class="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded transition-all duration-200">
+                            Copy
+                        </button>
+                    </div>
+                    <p class="text-xs text-purple-700 mt-2">📋 Copy this link and paste it in Chrome/Safari address bar to download your Sipp!</p>
+                </div>
+
                 <button id="downloadBtn"
                     class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                    Download / Open
+                    Generate Download Link
                 </button>
 
                 <button id="regenerateBtn" class="text-sm text-purple-800 hover:text-purple-700 underline">
@@ -70,75 +82,94 @@ body {
 let walletAddress = null;
 let currentProvider = null;
 
-// Wallet detection
+// Wallet detection on page load
 window.addEventListener('load', async () => {
     await new Promise(r => setTimeout(r, 500));
     const hasSolflare = window.solflare;
     const statusEl = document.getElementById('walletStatus');
+    
     if(!hasSolflare){
-        statusEl.textContent = '⚠️ Solflare wallet not detected. Please install Solflare.';
+        statusEl.textContent = '⚠️ Solflare wallet not detected. Please install Solflare extension.';
         statusEl.classList.add('text-red-700');
     } else {
-        statusEl.textContent = '✅ Solflare detected!';
+        statusEl.textContent = '✅ Solflare detected! Click to connect.';
         statusEl.classList.add('text-green-700');
     }
 });
 
-// Connect wallet
+// Connect Solflare wallet
 async function connectSolflare(){
     try{
         if(!window.solflare){
-            alert('Please install Solflare!');
+            alert('Please install Solflare wallet extension first!');
             window.open('https://solflare.com/', '_blank');
             return;
         }
+        
         await window.solflare.connect();
+        
         if(window.solflare.publicKey){
             walletAddress = window.solflare.publicKey.toString();
             currentProvider = window.solflare;
+            
+            // Update UI
             document.getElementById('walletAddress').textContent = walletAddress;
             document.getElementById('notConnected').style.display = 'none';
             document.getElementById('connected').style.display = 'block';
+            
+            // Generate the pixel art immediately
             generatePixelArt(walletAddress);
+        } else {
+            alert('Failed to get wallet address. Please try again.');
         }
     } catch(e){
-        console.error(e);
-        alert('Connection failed');
+        console.error('Wallet connection error:', e);
+        alert('Failed to connect wallet. Please try again.');
     }
 }
 
-// Disconnect
+// Disconnect wallet
 function disconnectWallet(){
-    if(currentProvider && currentProvider.disconnect){
-        currentProvider.disconnect();
+    try{
+        if(currentProvider && currentProvider.disconnect){
+            currentProvider.disconnect();
+        }
+    } catch(e){
+        console.error('Disconnect error:', e);
     }
+    
     walletAddress = null;
     currentProvider = null;
     document.getElementById('notConnected').style.display = 'flex';
     document.getElementById('connected').style.display = 'none';
+    document.getElementById('downloadLinkContainer').style.display = 'none';
 }
 
-// Seeded random number generator
+// Seeded random number generator for deterministic results
 class Random {
     constructor(seed) {
         this.seed = seed;
     }
+    
     next() {
         this.seed = (this.seed * 9301 + 49297) % 233280;
         return this.seed / 233280;
     }
+    
     range(min, max) {
         return Math.floor(this.next() * (max - min + 1)) + min;
     }
+    
     pick(arr) {
         return arr[Math.floor(this.next() * arr.length)];
     }
+    
     chance(probability) {
         return this.next() < probability;
     }
 }
 
-// Pixel PFP generator with unique characters
+// Main pixel art generation function
 function generatePixelArt(address){
     const canvas = document.getElementById('pixelCanvas');
     const ctx = canvas.getContext('2d');
@@ -147,14 +178,17 @@ function generatePixelArt(address){
     canvas.width = gridSize * pixelSize;
     canvas.height = gridSize * pixelSize;
     
-    // Create seeded random from wallet
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Create seeded random from wallet address
     let seed = 0;
     for(let i = 0; i < address.length; i++){
         seed = address.charCodeAt(i) + ((seed << 5) - seed);
     }
     const rng = new Random(Math.abs(seed));
     
-    // Background
+    // Generate gradient background
     const bgHue = rng.range(0, 360);
     const bgColors = [
         `hsl(${bgHue}, 70%, 60%)`,
@@ -167,7 +201,7 @@ function generatePixelArt(address){
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Skin tones
+    // Choose random skin tone (including weird colors)
     const skinTones = [
         '#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', 
         '#2ecc71', '#9b59b6', '#3498db', '#e74c3c', '#f39c12',
@@ -175,18 +209,19 @@ function generatePixelArt(address){
     ];
     const skinColor = rng.pick(skinTones);
     
-    // Head shape (10x12 pixels, centered, head and shoulders)
+    // Character dimensions
     const headWidth = 10;
     const headHeight = 10;
     const startX = Math.floor((gridSize - headWidth) / 2);
     const startY = 4;
     
-    // Draw face/head base (symmetrical)
+    // Draw head/face (symmetrical)
     for(let y = 0; y < headHeight; y++){
         for(let x = 0; x < headWidth; x++){
             const mirrorX = x < headWidth / 2 ? x : headWidth - 1 - x;
+            
             if(y < 8){
-                // Head shape
+                // Create rounded head shape
                 if((y === 0 && mirrorX >= 2 && mirrorX <= 3) ||
                    (y === 1 && mirrorX >= 1 && mirrorX <= 4) ||
                    (y >= 2 && y <= 7 && mirrorX >= 0 && mirrorX <= 4)){
@@ -196,22 +231,24 @@ function generatePixelArt(address){
         }
     }
     
-    // Shoulders (wider than head)
+    // Draw shoulders (wider than head for proper PFP look)
+    const shoulderStartY = startY + headHeight;
     for(let y = 0; y < 4; y++){
         for(let x = 0; x < 16; x++){
-            const shoulderY = startY + headHeight + y;
+            const shoulderY = shoulderStartY + y;
             const shoulderX = startX - 3 + x;
+            
             if(y === 0 && x >= 2 && x <= 13){
                 drawPixel(ctx, shoulderX, shoulderY, skinColor, pixelSize);
             } else if(y === 1 && x >= 1 && x <= 14){
-                drawPixel(ctx, shoulderX, shoulderY, darkenColor(skinColor, 20), pixelSize);
+                drawPixel(ctx, shoulderX, shoulderY, darkenColor(skinColor, 15), pixelSize);
             } else if(y >= 2 && x >= 0 && x <= 15){
-                drawPixel(ctx, shoulderX, shoulderY, darkenColor(skinColor, 30), pixelSize);
+                drawPixel(ctx, shoulderX, shoulderY, darkenColor(skinColor, 25), pixelSize);
             }
         }
     }
     
-    // Hair styles (inspired by CryptoPunks, Bored Apes, etc.)
+    // Generate unique character traits
     const hairStyles = ['mohawk', 'wild', 'cap', 'bandana', 'crown', 'horns', 'antenna', 'beanie', 'afro'];
     const hairStyle = rng.pick(hairStyles);
     const hairColors = ['#2c1810', '#8b4513', '#daa520', '#ff6347', '#00ff00', '#ff00ff', '#00ffff', '#ffff00'];
@@ -219,23 +256,28 @@ function generatePixelArt(address){
     
     drawHair(ctx, startX, startY, headWidth, hairStyle, hairColor, pixelSize, rng);
     
-    // Eyes (weird and varied, inspired by NFT projects)
+    // Draw eyes
     const eyeTypes = ['normal', 'laser', '3d', 'heart', 'dollar', 'x', 'spiral', 'robot', 'alien', 'cyclops'];
     const eyeType = rng.pick(eyeTypes);
     drawEyes(ctx, startX, startY, headWidth, eyeType, pixelSize, rng);
     
-    // Mouth (varied expressions)
+    // Draw mouth
     const mouthTypes = ['smile', 'frown', 'teeth', 'tongue', 'vampire', 'zipper', 'gold', 'rainbow', 'missing'];
     const mouthType = rng.pick(mouthTypes);
     drawMouth(ctx, startX, startY, headWidth, mouthType, pixelSize, rng);
     
-    // Accessories (inspired by all NFT projects)
-    if(rng.chance(0.4)) drawAccessory(ctx, startX, startY, headWidth, pixelSize, rng);
+    // Add accessories (40% chance)
+    if(rng.chance(0.4)){
+        drawAccessory(ctx, startX, startY, headWidth, pixelSize, rng);
+    }
     
-    // Face details
-    if(rng.chance(0.3)) drawFaceDetail(ctx, startX, startY, headWidth, pixelSize, rng);
+    // Add face details (30% chance)
+    if(rng.chance(0.3)){
+        drawFaceDetail(ctx, startX, startY, headWidth, pixelSize, rng);
+    }
 }
 
+// Helper function to draw a single pixel
 function drawPixel(ctx, x, y, color, size){
     ctx.fillStyle = color;
     ctx.fillRect(x * size, y * size, size, size);
@@ -243,8 +285,8 @@ function drawPixel(ctx, x, y, color, size){
     ctx.strokeRect(x * size, y * size, size, size);
 }
 
+// Draw hair based on style
 function drawHair(ctx, startX, startY, width, style, color, pxSize, rng){
-    const positions = [];
     switch(style){
         case 'mohawk':
             for(let i = 0; i < 4; i++){
@@ -252,40 +294,57 @@ function drawHair(ctx, startX, startY, width, style, color, pxSize, rng){
                 drawPixel(ctx, startX + 5, startY - 2 + i, color, pxSize);
             }
             break;
+            
         case 'wild':
             for(let x = 0; x < width; x++){
                 if(rng.chance(0.7)){
                     drawPixel(ctx, startX + x, startY - 1, color, pxSize);
-                    if(rng.chance(0.5)) drawPixel(ctx, startX + x, startY - 2, color, pxSize);
+                    if(rng.chance(0.5)){
+                        drawPixel(ctx, startX + x, startY - 2, color, pxSize);
+                    }
                 }
             }
             break;
+            
         case 'cap':
-            for(let x = 2; x < 8; x++) drawPixel(ctx, startX + x, startY, color, pxSize);
-            for(let x = 1; x < 9; x++) drawPixel(ctx, startX + x, startY - 1, color, pxSize);
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, startY, color, pxSize);
+            }
+            for(let x = 1; x < 9; x++){
+                drawPixel(ctx, startX + x, startY - 1, color, pxSize);
+            }
             break;
+            
         case 'bandana':
-            for(let x = 1; x < 9; x++) drawPixel(ctx, startX + x, startY + 1, color, pxSize);
+            for(let x = 1; x < 9; x++){
+                drawPixel(ctx, startX + x, startY + 1, color, pxSize);
+            }
             drawPixel(ctx, startX + 9, startY + 2, color, pxSize);
             break;
+            
         case 'crown':
             for(let x = 2; x < 8; x++){
                 drawPixel(ctx, startX + x, startY - 1, '#ffd700', pxSize);
-                if(x % 2 === 0) drawPixel(ctx, startX + x, startY - 2, '#ffd700', pxSize);
+                if(x % 2 === 0){
+                    drawPixel(ctx, startX + x, startY - 2, '#ffd700', pxSize);
+                }
             }
             break;
+            
         case 'horns':
             drawPixel(ctx, startX + 1, startY - 1, '#ff0000', pxSize);
             drawPixel(ctx, startX + 1, startY - 2, '#ff0000', pxSize);
             drawPixel(ctx, startX + 8, startY - 1, '#ff0000', pxSize);
             drawPixel(ctx, startX + 8, startY - 2, '#ff0000', pxSize);
             break;
+            
         case 'antenna':
             drawPixel(ctx, startX + 4, startY - 3, color, pxSize);
             drawPixel(ctx, startX + 5, startY - 3, color, pxSize);
             drawPixel(ctx, startX + 4, startY - 4, '#ff00ff', pxSize);
             drawPixel(ctx, startX + 5, startY - 4, '#ff00ff', pxSize);
             break;
+            
         case 'beanie':
             for(let y = -2; y < 1; y++){
                 for(let x = 1; x < 9; x++){
@@ -295,6 +354,7 @@ function drawHair(ctx, startX, startY, width, style, color, pxSize, rng){
             drawPixel(ctx, startX + 4, startY - 3, color, pxSize);
             drawPixel(ctx, startX + 5, startY - 3, color, pxSize);
             break;
+            
         case 'afro':
             for(let y = -2; y < 2; y++){
                 for(let x = 0; x < width; x++){
@@ -307,6 +367,7 @@ function drawHair(ctx, startX, startY, width, style, color, pxSize, rng){
     }
 }
 
+// Draw eyes based on type
 function drawEyes(ctx, startX, startY, width, type, pxSize, rng){
     const leftEyeX = startX + 2;
     const rightEyeX = startX + 7;
@@ -317,24 +378,29 @@ function drawEyes(ctx, startX, startY, width, type, pxSize, rng){
             drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
             break;
+            
         case 'laser':
             drawPixel(ctx, leftEyeX, eyeY, '#ff0000', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#ff0000', pxSize);
             drawPixel(ctx, leftEyeX - 1, eyeY, '#ff0000', pxSize);
             drawPixel(ctx, rightEyeX + 1, eyeY, '#ff0000', pxSize);
             break;
+            
         case '3d':
             drawPixel(ctx, leftEyeX, eyeY, '#00ffff', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#ff0000', pxSize);
             break;
+            
         case 'heart':
             drawPixel(ctx, leftEyeX, eyeY, '#ff1493', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#ff1493', pxSize);
             break;
+            
         case 'dollar':
             drawPixel(ctx, leftEyeX, eyeY, '#00ff00', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#00ff00', pxSize);
             break;
+            
         case 'x':
             drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
@@ -343,24 +409,28 @@ function drawEyes(ctx, startX, startY, width, type, pxSize, rng){
             drawPixel(ctx, rightEyeX - 1, eyeY - 1, '#000', pxSize);
             drawPixel(ctx, rightEyeX + 1, eyeY + 1, '#000', pxSize);
             break;
+            
         case 'spiral':
             drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
             drawPixel(ctx, leftEyeX - 1, eyeY, '#666', pxSize);
             drawPixel(ctx, rightEyeX + 1, eyeY, '#666', pxSize);
             break;
+            
         case 'robot':
             drawPixel(ctx, leftEyeX, eyeY, '#00ff00', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#00ff00', pxSize);
             drawPixel(ctx, leftEyeX, eyeY - 1, '#00ff00', pxSize);
             drawPixel(ctx, rightEyeX, eyeY - 1, '#00ff00', pxSize);
             break;
+            
         case 'alien':
             drawPixel(ctx, leftEyeX - 1, eyeY, '#000', pxSize);
             drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
             drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
             drawPixel(ctx, rightEyeX + 1, eyeY, '#000', pxSize);
             break;
+            
         case 'cyclops':
             drawPixel(ctx, startX + 4, eyeY, '#ff0000', pxSize);
             drawPixel(ctx, startX + 5, eyeY, '#ff0000', pxSize);
@@ -368,9 +438,9 @@ function drawEyes(ctx, startX, startY, width, type, pxSize, rng){
     }
 }
 
+// Draw mouth based on type
 function drawMouth(ctx, startX, startY, width, type, pxSize, rng){
     const mouthY = startY + 6;
-    const mouthCenterX = startX + Math.floor(width / 2);
     
     switch(type){
         case 'smile':
@@ -378,17 +448,20 @@ function drawMouth(ctx, startX, startY, width, type, pxSize, rng){
                 drawPixel(ctx, startX + x, mouthY, '#000', pxSize);
             }
             break;
+            
         case 'frown':
             for(let x = 2; x < 8; x++){
                 drawPixel(ctx, startX + x, mouthY + 1, '#000', pxSize);
             }
             break;
+            
         case 'teeth':
             for(let x = 2; x < 8; x++){
                 drawPixel(ctx, startX + x, mouthY, '#fff', pxSize);
                 drawPixel(ctx, startX + x, mouthY - 1, '#000', pxSize);
             }
             break;
+            
         case 'tongue':
             for(let x = 3; x < 7; x++){
                 drawPixel(ctx, startX + x, mouthY, '#ff69b4', pxSize);
@@ -396,6 +469,7 @@ function drawMouth(ctx, startX, startY, width, type, pxSize, rng){
             drawPixel(ctx, startX + 4, mouthY + 1, '#ff69b4', pxSize);
             drawPixel(ctx, startX + 5, mouthY + 1, '#ff69b4', pxSize);
             break;
+            
         case 'vampire':
             for(let x = 2; x < 8; x++){
                 drawPixel(ctx, startX + x, mouthY, '#000', pxSize);
@@ -403,22 +477,26 @@ function drawMouth(ctx, startX, startY, width, type, pxSize, rng){
             drawPixel(ctx, startX + 3, mouthY + 1, '#fff', pxSize);
             drawPixel(ctx, startX + 6, mouthY + 1, '#fff', pxSize);
             break;
+            
         case 'zipper':
             for(let x = 3; x < 7; x++){
                 drawPixel(ctx, startX + x, mouthY, '#888', pxSize);
             }
             break;
+            
         case 'gold':
             for(let x = 2; x < 8; x++){
                 drawPixel(ctx, startX + x, mouthY, '#ffd700', pxSize);
             }
             break;
+            
         case 'rainbow':
             const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082'];
             for(let x = 2; x < 8; x++){
                 drawPixel(ctx, startX + x, mouthY, colors[(x - 2) % colors.length], pxSize);
             }
             break;
+            
         case 'missing':
             drawPixel(ctx, startX + 3, mouthY, '#000', pxSize);
             drawPixel(ctx, startX + 6, mouthY, '#000', pxSize);
@@ -426,45 +504,53 @@ function drawMouth(ctx, startX, startY, width, type, pxSize, rng){
     }
 }
 
+// Draw accessories
 function drawAccessory(ctx, startX, startY, width, pxSize, rng){
     const accessories = ['glasses', 'sunglasses', 'monocle', 'cigarette', 'pipe', 'earring'];
     const accessory = rng.pick(accessories);
     
     switch(accessory){
         case 'glasses':
-            drawPixel(ctx, startX + 1, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 2, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 3, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 6, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 7, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 8, startY + 3, '#000', pxSize);
+            for(let x = 1; x <= 3; x++){
+                drawPixel(ctx, startX + x, startY + 3, '#000', pxSize);
+            }
+            for(let x = 6; x <= 8; x++){
+                drawPixel(ctx, startX + x, startY + 3, '#000', pxSize);
+            }
             drawPixel(ctx, startX + 4, startY + 3, '#000', pxSize);
             drawPixel(ctx, startX + 5, startY + 3, '#000', pxSize);
             break;
+            
         case 'sunglasses':
-            drawPixel(ctx, startX + 2, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 3, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 6, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 7, startY + 3, '#000', pxSize);
+            for(let x = 2; x <= 3; x++){
+                drawPixel(ctx, startX + x, startY + 3, '#000', pxSize);
+            }
+            for(let x = 6; x <= 7; x++){
+                drawPixel(ctx, startX + x, startY + 3, '#000', pxSize);
+            }
             drawPixel(ctx, startX + 4, startY + 3, '#000', pxSize);
             drawPixel(ctx, startX + 5, startY + 3, '#000', pxSize);
             break;
+            
         case 'monocle':
-            drawPixel(ctx, startX + 2, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 3, startY + 3, '#000', pxSize);
-            drawPixel(ctx, startX + 2, startY + 4, '#000', pxSize);
-            drawPixel(ctx, startX + 3, startY + 4, '#000', pxSize);
+            for(let x = 2; x <= 3; x++){
+                drawPixel(ctx, startX + x, startY + 3, '#000', pxSize);
+                drawPixel(ctx, startX + x, startY + 4, '#000', pxSize);
+            }
             break;
+            
         case 'cigarette':
             drawPixel(ctx, startX + 6, startY + 5, '#fff', pxSize);
             drawPixel(ctx, startX + 7, startY + 5, '#fff', pxSize);
             drawPixel(ctx, startX + 8, startY + 5, '#ff6347', pxSize);
             break;
+            
         case 'pipe':
             drawPixel(ctx, startX + 6, startY + 6, '#8b4513', pxSize);
             drawPixel(ctx, startX + 7, startY + 6, '#8b4513', pxSize);
             drawPixel(ctx, startX + 7, startY + 5, '#8b4513', pxSize);
             break;
+            
         case 'earring':
             drawPixel(ctx, startX + 1, startY + 5, '#ffd700', pxSize);
             drawPixel(ctx, startX + 8, startY + 5, '#ffd700', pxSize);
@@ -472,6 +558,7 @@ function drawAccessory(ctx, startX, startY, width, pxSize, rng){
     }
 }
 
+// Draw face details
 function drawFaceDetail(ctx, startX, startY, width, pxSize, rng){
     const details = ['scar', 'freckles', 'tattoo', 'blush', 'nose_ring'];
     const detail = rng.pick(details);
@@ -482,71 +569,142 @@ function drawFaceDetail(ctx, startX, startY, width, pxSize, rng){
             drawPixel(ctx, startX + 7, startY + 3, '#8b0000', pxSize);
             drawPixel(ctx, startX + 7, startY + 4, '#8b0000', pxSize);
             break;
+            
         case 'freckles':
             drawPixel(ctx, startX + 3, startY + 4, '#a0522d', pxSize);
             drawPixel(ctx, startX + 6, startY + 4, '#a0522d', pxSize);
             drawPixel(ctx, startX + 2, startY + 5, '#a0522d', pxSize);
             drawPixel(ctx, startX + 7, startY + 5, '#a0522d', pxSize);
             break;
+            
         case 'tattoo':
             drawPixel(ctx, startX + 1, startY + 4, '#000', pxSize);
             drawPixel(ctx, startX + 1, startY + 5, '#000', pxSize);
             break;
+            
         case 'blush':
             drawPixel(ctx, startX + 1, startY + 5, '#ff69b4', pxSize);
             drawPixel(ctx, startX + 8, startY + 5, '#ff69b4', pxSize);
             break;
+            
         case 'nose_ring':
             drawPixel(ctx, startX + 5, startY + 5, '#c0c0c0', pxSize);
             break;
     }
 }
 
+// Darken a hex color by a percentage
 function darkenColor(color, percent){
     const num = parseInt(color.replace('#',''), 16);
     const amt = Math.round(2.55 * percent);
-    const R = (num >> 16) - amt;
-    const G = (num >> 8 & 0x00FF) - amt;
-    const B = (num & 0x0000FF) - amt;
-    return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
-        (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
-        .toString(16).slice(1);
+    const R = Math.max(0, Math.min(255, (num >> 16) - amt));
+    const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) - amt));
+    const B = Math.max(0, Math.min(255, (num & 0x0000FF) - amt));
+    return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
 }
 
-// Convert dataURL to blob
+// Convert canvas data URL to blob
 function dataURLtoBlob(dataurl){
-    const arr=dataurl.split(',');
-    const mime=arr[0].match(/:(.*?);/)[1];
-    const bstr=atob(arr[1]);
-    let n=bstr.length;
-    const u8arr=new Uint8Array(n);
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
     while(n--){
-        u8arr[n]=bstr.charCodeAt(n);
+        u8arr[n] = bstr.charCodeAt(n);
     }
-    return new Blob([u8arr], {type:mime});
+    return new Blob([u8arr], {type: mime});
 }
 
-// Download / open
+// Download/open the NFT image
 function downloadNFT(){
-    const canvas=document.getElementById('pixelCanvas');
-    const imageData=canvas.toDataURL();
-    const blob=dataURLtoBlob(imageData);
-    const url=URL.createObjectURL(blob);
-
-    const isSolflare=/Solflare/i.test(navigator.userAgent);
-    if(isSolflare){
-        alert('⚠️ Solflare browser blocks downloads. Open this link in Chrome or Safari to save your Sipp.');
+    const canvas = document.getElementById('pixelCanvas');
+    const linkContainer = document.getElementById('downloadLinkContainer');
+    const linkInput = document.getElementById('downloadLinkInput');
+    
+    if(!canvas){
+        alert('Canvas not found. Please try again.');
+        return;
     }
+    
+    try{
+        // Convert canvas to data URL
+        const imageData = canvas.to
+        const imageData = canvas.toDataURL('image/png');
+        
+        // Convert to blob
+        const blob = dataURLtoBlob(imageData);
+        
+        // Create object URL
+        const url = URL.createObjectURL(blob);
+        
+        // Display the link
+        linkInput.value = url;
+        linkContainer.style.display = 'block';
+        
+        // Check if running in Solflare browser
+        const isSolflare = /Solflare/i.test(navigator.userAgent);
+        if(isSolflare){
+            alert('⚠️ Solflare browser detected. Copy the link below and paste it in Chrome or Safari to download your Sipp!');
+        } else {
+            // Also open in new tab for convenience
+            window.open(url, '_blank');
+        }
+        
+        // Don't revoke URL since user needs to copy it
+        
+    } catch(e){
+        console.error('Download error:', e);
+        alert('Failed to generate download link. Please try again.');
+    }
+}
 
-    window.open(url,'_blank');
+// Copy link to clipboard
+function copyLink(){
+    const linkInput = document.getElementById('downloadLinkInput');
+    
+    try{
+        linkInput.select();
+        linkInput.setSelectionRange(0, 99999); // For mobile devices
+        
+        // Copy to clipboard
+        document.execCommand('copy');
+        
+        // Visual feedback
+        const copyBtn = document.getElementById('copyLinkBtn');
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copied!';
+        copyBtn.classList.add('bg-green-500');
+        copyBtn.classList.remove('bg-purple-500');
+        
+        setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('bg-green-500');
+            copyBtn.classList.add('bg-purple-500');
+        }, 2000);
+        
+    } catch(e){
+        console.error('Copy error:', e);
+        alert('Failed to copy. Please select and copy manually.');
+    }
 }
 
 // Event listeners
-document.getElementById('connectSolflareBtn').addEventListener('click',connectSolflare);
-document.getElementById('disconnectBtn').addEventListener('click',disconnectWallet);
-document.getElementById('downloadBtn').addEventListener('click',downloadNFT);
-document.getElementById('regenerateBtn').addEventListener('click',()=>{if(walletAddress){generatePixelArt(walletAddress)}});
+document.getElementById('connectSolflareBtn').addEventListener('click', connectSolflare);
+document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
+document.getElementById('downloadBtn').addEventListener('click', downloadNFT);
+document.getElementById('copyLinkBtn').addEventListener('click', copyLink);
+document.getElementById('regenerateBtn').addEventListener('click', () => {
+    if(walletAddress){
+        // Hide old download link when regenerating
+        document.getElementById('downloadLinkContainer').style.display = 'none';
+        generatePixelArt(walletAddress);
+    } else {
+        alert('Please connect your wallet first.');
+    }
+});
 
 </script>
 </body>
 </html>
+`
