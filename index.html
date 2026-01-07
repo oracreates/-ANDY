@@ -1,143 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wallet Pixel NFT</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    canvas {
-      image-rendering: pixelated;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Solana Wallet PFP Generator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { margin: 0; }
+  canvas { image-rendering: pixelated; }
+</style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
 
-<div class="max-w-xl w-full bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 text-center">
-  <h1 class="text-3xl font-bold text-white mb-2">Wallet Pixel NFT</h1>
-  <p class="text-purple-300 mb-6">Your wallet, your identity</p>
+<body class="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
 
-  <!-- NOT CONNECTED -->
-  <div id="notConnected" class="space-y-4">
-    <button id="connectSolflare" class="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-semibold">
-      Connect Solflare
-    </button>
-    <button id="connectPhantom" class="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg font-semibold">
-      Connect Phantom
-    </button>
-    <p id="status" class="text-yellow-300 text-sm"></p>
-  </div>
+<div class="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20 max-w-xl w-full text-center">
+  <h1 class="text-3xl font-bold text-white mb-2">Wallet PFP Generator</h1>
+  <p class="text-purple-200 mb-6">Your wallet, your identity.</p>
 
-  <!-- CONNECTED -->
-  <div id="connected" class="hidden space-y-4">
-    <p class="text-purple-300 text-sm break-all" id="walletAddress"></p>
+  <button id="connectBtn"
+    class="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-semibold hover:scale-105 transition">
+    Connect Phantom
+  </button>
 
-    <div class="flex justify-center">
-      <canvas id="pixelCanvas" width="320" height="320" class="rounded-xl border-4 border-white/30"></canvas>
-    </div>
+  <div id="pfp" class="mt-6 hidden">
+    <canvas id="canvas" width="320" height="320"
+      class="mx-auto rounded-xl shadow-xl border-4 border-white/20"></canvas>
 
-    <div class="flex gap-3 justify-center">
-      <button id="regen" class="px-4 py-2 bg-purple-500 text-white rounded-lg">Regenerate</button>
-      <button id="download" class="px-4 py-2 bg-green-500 text-white rounded-lg">Download</button>
-      <button id="disconnect" class="px-4 py-2 bg-red-500 text-white rounded-lg">Disconnect</button>
+    <div class="flex justify-center gap-4 mt-4">
+      <button id="regen"
+        class="px-4 py-2 bg-indigo-500 text-white rounded-lg">Regenerate</button>
+      <button id="download"
+        class="px-4 py-2 bg-green-500 text-white rounded-lg">Download</button>
     </div>
   </div>
 </div>
 
 <script>
-let walletAddress = null;
-let provider = null;
-
-const canvas = document.getElementById("pixelCanvas");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const SIZE = 20;
+const GRID = 16;
 
-function hashString(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h << 5) - h + str.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h);
-}
+let wallet = null;
 
-function generatePixelArt(address) {
-  const grid = 16;
-  const size = 20;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const seed = hashString(address);
-  const hue = seed % 360;
-
-  const palette = [
-    `hsl(${hue},70%,60%)`,
-    `hsl(${(hue+30)%360},70%,50%)`,
-    `hsl(${(hue+60)%360},70%,55%)`,
-    `hsl(${(hue+90)%360},70%,45%)`
-  ];
-
-  for (let y = 0; y < grid; y++) {
-    for (let x = 0; x < grid / 2; x++) {
-      const v = (seed + x * 31 + y * 17) % 100;
-      if (v > 45) {
-        const color = palette[(x + y) % palette.length];
-        ctx.fillStyle = color;
-
-        ctx.fillRect(x * size, y * size, size, size);
-        ctx.fillRect((grid - 1 - x) * size, y * size, size, size);
-      }
-    }
-  }
-}
-
-function showConnected() {
-  document.getElementById("notConnected").classList.add("hidden");
-  document.getElementById("connected").classList.remove("hidden");
-  document.getElementById("walletAddress").textContent = walletAddress;
-  generatePixelArt(walletAddress);
-}
-
-async function connectSolflare() {
-  if (!window.solflare) {
-    alert("Install Solflare");
-    return;
-  }
-  await window.solflare.connect();
-  provider = window.solflare;
-  walletAddress = provider.publicKey.toString();
-  showConnected();
-}
-
-async function connectPhantom() {
+// ---- WALLET ----
+document.getElementById("connectBtn").onclick = async () => {
   if (!window.solana || !window.solana.isPhantom) {
-    alert("Install Phantom");
+    alert("Install Phantom Wallet");
     return;
   }
   const res = await window.solana.connect();
-  provider = window.solana;
-  walletAddress = res.publicKey.toString();
-  showConnected();
+  wallet = res.publicKey.toString();
+  document.getElementById("pfp").classList.remove("hidden");
+  generatePFP(wallet);
+};
+
+// ---- HASH ----
+function hash(str) {
+  let h = 0;
+  for (let c of str) h = Math.imul(31, h) + c.charCodeAt(0);
+  return Math.abs(h);
 }
 
-function disconnect() {
-  if (provider?.disconnect) provider.disconnect();
-  walletAddress = null;
-  provider = null;
-  document.getElementById("connected").classList.add("hidden");
-  document.getElementById("notConnected").classList.remove("hidden");
+// ---- GENERATOR ----
+function generatePFP(address) {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const seed = hash(address);
+  const hue = seed % 360;
+
+  const skin = `hsl(${hue},50%,65%)`;
+  const dark = `hsl(${hue},40%,30%)`;
+  const accent = `hsl(${(hue+80)%360},70%,55%)`;
+  const laser = `hsl(0,100%,60%)`;
+
+  const rareHalo = seed % 20 === 0;
+  const crown = seed % 50 === 0;
+
+  // ---- BACKGROUND ----
+  ctx.fillStyle = rareHalo ? accent : "#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // ---- FACE MASK ----
+  const mask = [
+    "0011111100000000",
+    "0111111110000000",
+    "1111111111000000",
+    "1111111111000000",
+    "1111111111000000",
+    "1111111111000000",
+    "1111111111000000",
+    "1111111111000000",
+    "1111111111000000",
+    "1111111111000000",
+    "0111111110000000",
+    "0011111100000000"
+  ];
+
+  mask.forEach((row,y)=>{
+    for(let x=0;x<row.length/2;x++){
+      if(row[x]==="1"){
+        ctx.fillStyle = skin;
+        ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
+        ctx.fillRect((GRID-1-x)*SIZE,y*SIZE,SIZE,SIZE);
+      }
+    }
+  });
+
+  // ---- EYES ----
+  const eyeType = seed % 4;
+  const eyeY = 5;
+  const eyeX = 4;
+
+  ctx.fillStyle = eyeType === 1 ? laser : dark;
+
+  if (eyeType === 2) {
+    // sleepy
+    ctx.fillRect(eyeX*SIZE,eyeY*SIZE,SIZE*2,SIZE/2);
+    ctx.fillRect((GRID-eyeX-2)*SIZE,eyeY*SIZE,SIZE*2,SIZE/2);
+  } else {
+    ctx.fillRect(eyeX*SIZE,eyeY*SIZE,SIZE,SIZE);
+    ctx.fillRect((GRID-eyeX-1)*SIZE,eyeY*SIZE,SIZE,SIZE);
+  }
+
+  // ---- MOUTH ----
+  const mood = seed % 3;
+  ctx.fillStyle = dark;
+  if (mood === 0)
+    ctx.fillRect(7*SIZE,9*SIZE,2*SIZE,SIZE/2); // smile
+  if (mood === 1)
+    ctx.fillRect(7*SIZE,9*SIZE,2*SIZE,SIZE/4); // neutral
+  if (mood === 2)
+    ctx.fillRect(7*SIZE,10*SIZE,2*SIZE,SIZE/2); // sad
+
+  // ---- ACCESSORIES ----
+  if (seed % 3 === 0) {
+    // earring
+    ctx.fillStyle = accent;
+    ctx.fillRect(3*SIZE,8*SIZE,SIZE/2,SIZE);
+  }
+
+  if (seed % 7 === 0) {
+    // scar
+    ctx.fillStyle = dark;
+    ctx.fillRect(8*SIZE,6*SIZE,SIZE/4,2*SIZE);
+  }
+
+  if (seed % 9 === 0) {
+    // glasses
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(3*SIZE,5*SIZE,3*SIZE,2*SIZE);
+    ctx.strokeRect(10*SIZE,5*SIZE,3*SIZE,2*SIZE);
+  }
+
+  // ---- RARE CROWN ----
+  if (crown) {
+    ctx.fillStyle = "gold";
+    ctx.fillRect(5*SIZE,2*SIZE,6*SIZE,SIZE);
+  }
 }
 
-document.getElementById("connectSolflare").onclick = connectSolflare;
-document.getElementById("connectPhantom").onclick = connectPhantom;
-document.getElementById("disconnect").onclick = disconnect;
-document.getElementById("regen").onclick = () => generatePixelArt(walletAddress);
-document.getElementById("download").onclick = () => {
+// ---- BUTTONS ----
+document.getElementById("regen").onclick = ()=>generatePFP(wallet);
+document.getElementById("download").onclick = ()=>{
   const a = document.createElement("a");
-  a.download = "wallet-pixel-nft.png";
+  a.download = "wallet-pfp.png";
   a.href = canvas.toDataURL();
   a.click();
 };
 </script>
-
 </body>
 </html>
