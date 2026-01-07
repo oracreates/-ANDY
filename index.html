@@ -145,6 +145,135 @@
             }
         });
 
+        async function connectSolflare() {
+            try {
+                if (!window.solflare) {
+                    alert('Solflare wallet not found! Please install the Solflare browser extension.');
+                    window.open('https://solflare.com/', '_blank');
+                    return;
+                }
+
+                console.log('Connecting to Solflare...');
+                await window.solflare.connect();
+                
+                if (window.solflare.publicKey) {
+                    walletAddress = window.solflare.publicKey.toString();
+                    currentProvider = window.solflare;
+                    document.getElementById('walletType').textContent = 'Solflare';
+                    showConnectedState();
+                    console.log('Connected successfully!', walletAddress);
+                } else {
+                    throw new Error('No public key returned from wallet');
+                }
+            } catch (err) {
+                console.error('Solflare connection error:', err);
+                alert('Connection error: ' + (err.message || 'User rejected the connection'));
+            }
+        }
+
+        async function connectPhantom() {
+            try {
+                if (!window.solana || !window.solana.isPhantom) {
+                    alert('Phantom wallet not found! Please install the Phantom browser extension.');
+                    window.open('https://phantom.app/', '_blank');
+                    return;
+                }
+
+                console.log('Connecting to Phantom...');
+                const resp = await window.solana.connect();
+                
+                if (resp.publicKey) {
+                    walletAddress = resp.publicKey.toString();
+                    currentProvider = window.solana;
+                    document.getElementById('walletType').textContent = 'Phantom';
+                    showConnectedState();
+                    console.log('Connected successfully!', walletAddress);
+                } else {
+                    throw new Error('No public key returned from wallet');
+                }
+            } catch (err) {
+                console.error('Phantom connection error:', err);
+                alert('Connection error: ' + (err.message || 'User rejected the connection'));
+            }
+        }
+
+        function showConnectedState() {
+            document.getElementById('walletAddress').textContent = walletAddress;
+            document.getElementById('notConnected').style.display = 'none';
+            document.getElementById('connected').style.display = 'block';
+            generatePixelArt(walletAddress);
+        }
+
+        function disconnectWallet() {
+            if (currentProvider) {
+                try {
+                    if (currentProvider.disconnect) {
+                        currentProvider.disconnect();
+                    }
+                } catch (err) {
+                    console.log('Disconnect error:', err);
+                }
+            }
+            
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            
+            walletAddress = null;
+            currentProvider = null;
+            
+            document.getElementById('notConnected').style.display = 'flex';
+            document.getElementById('connected').style.display = 'none';
+        }
+
+        // Event listeners
+        document.getElementById('connectSolflareBtn').addEventListener('click', connectSolflare);
+        document.getElementById('connectPhantomBtn').addEventListener('click', connectPhantom);
+        document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
+        document.getElementById('downloadBtn').addEventListener('click', downloadNFT);
+        document.getElementById('regenerateBtn').addEventListener('click', () => {
+            if (walletAddress) {
+                generatePixelArt(walletAddress);
+            }
+        });
+
+        if (window.solflare) {
+            window.solflare.on('connect', (publicKey) => {
+                console.log('Solflare connected event:', publicKey.toString());
+            });
+            window.solflare.on('disconnect', () => {
+                console.log('Solflare disconnected');
+                disconnectWallet();
+            });
+        }
+
+        if (window.solana) {
+            window.solana.on('connect', (publicKey) => {
+                console.log('Phantom connected event:', publicKey.toString());
+            });
+            window.solana.on('disconnect', () => {
+                console.log('Phantom disconnected');
+                disconnectWallet();
+            });
+        }
+    </script>
+</body>
+</html>El.textContent = '⚠️ No Solana wallet detected. Please install Solflare or Phantom.';
+            } else if (hasSolflare && hasPhantom) {
+                statusEl.textContent = '✅ Both Solflare and Phantom detected!';
+                statusEl.classList.remove('text-yellow-300');
+                statusEl.classList.add('text-green-300');
+            } else if (hasSolflare) {
+                statusEl.textContent = '✅ Solflare wallet detected!';
+                statusEl.classList.remove('text-yellow-300');
+                statusEl.classList.add('text-green-300');
+            } else if (hasPhantom) {
+                statusEl.textContent = '✅ Phantom wallet detected!';
+                statusEl.classList.remove('text-yellow-300');
+                statusEl.classList.add('text-green-300');
+            }
+        });
+
         // Connect to Solflare
         async function connectSolflare() {
             try {
