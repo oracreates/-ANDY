@@ -1,151 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Sipp — Your pixels, your identity</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sipp</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  canvas {
-    image-rendering: pixelated;
-  }
+body {margin:0;padding:0;}
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
 </style>
 </head>
+<body>
+<div id="app" class="min-h-screen bg-gradient-to-br from-yellow-300 via-pink-300 to-purple-300 flex items-center justify-center p-4">
+  <div class="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-white mb-2">Sipp</h1>
+      <p class="text-purple-900 text-lg">Your pixels, your identity</p>
+    </div>
 
-<body class="min-h-screen flex items-center justify-center bg-yellow-50">
-<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md text-center">
+    <!-- Not Connected -->
+    <div id="notConnected" class="flex flex-col items-center space-y-6">
+      <button id="connectSolflareBtn" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+        Connect Solflare Wallet
+      </button>
+      <div id="walletStatus" class="text-sm text-yellow-300"></div>
+    </div>
 
-  <h1 class="text-4xl font-bold mb-1">Sipp</h1>
-  <p class="text-gray-600 mb-6">Your pixels, your identity</p>
+    <!-- Connected -->
+    <div id="connected" class="space-y-6" style="display:none;">
+      <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+        <p class="text-sm text-purple-300 mb-1">Drop your Sipp</p>
+        <p id="walletAddress" class="text-white font-mono text-sm break-all"></p>
+      </div>
 
-  <button id="connectBtn"
-    class="px-6 py-3 bg-black text-white rounded-xl hover:scale-105 transition">
-    Connect Wallet
-  </button>
+      <div class="flex flex-col items-center space-y-4">
+        <div class="bg-white/10 p-6 rounded-xl border-4 border-white/20 shadow-2xl">
+          <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
+        </div>
 
-  <div id="connected" class="hidden mt-6">
-    <canvas id="pfp" width="256" height="256"
-      class="mx-auto border-4 border-black rounded-xl"></canvas>
+        <div class="flex gap-4">
+          <button id="downloadBtn" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">Download NFT</button>
+          <button id="disconnectBtn" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">Disconnect</button>
+        </div>
 
-    <button id="download"
-      class="mt-4 px-5 py-2 bg-green-500 text-white rounded-lg">
-      Download
-    </button>
+        <button id="regenerateBtn" class="text-sm text-purple-300 hover:text-purple-200 underline">Regenerate Art ($0.5)</button>
+      </div>
+    </div>
   </div>
-
 </div>
 
 <script>
-let wallet = null;
+let walletAddress = null;
+let currentProvider = null;
 
-// ---------- WALLET ----------
-document.getElementById("connectBtn").onclick = async () => {
-  if (!window.solflare) {
-    alert("Install Solflare");
-    return;
+// deterministic hash for each wallet
+function hashCode(str) {
+  let hash = 0;
+  for(let i=0;i<str.length;i++){hash=str.charCodeAt(i)+((hash<<5)-hash);}
+  return Math.abs(hash);
+}
+
+// Pick trait from array deterministically
+function pickTrait(walletHash, arr, salt){
+  return arr[(walletHash + salt)%arr.length];
+}
+
+// Traits
+const traits = {
+  background: ['#FDE68A','#FCA5A5','#A5F3FC','#C7D2FE','#FBCFE8'],
+  head: ['round','square','alien','robot'],
+  eyes: ['googly','happy','angry','sleepy','winking'],
+  mouth: ['grin','frown','smile','tongue','drooling'],
+  hair: ['mohawk','spiky','messy','bald','braid'],
+  accessories: ['glasses','hat','earring','scar','none'],
+  aura: ['halo','sparkles','fire','glow','none']
+};
+
+// Pixel PFP generator
+function generatePixelArt(address){
+  const canvas = document.getElementById('pixelCanvas');
+  const ctx = canvas.getContext('2d');
+  const gridSize = 16;
+  const pixelSize = 20;
+
+  canvas.width = gridSize*pixelSize;
+  canvas.height = gridSize*pixelSize;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const walletHash = hashCode(address);
+
+  // Pick traits
+  const bg = pickTrait(walletHash, traits.background, 1);
+  const headType = pickTrait(walletHash, traits.head, 2);
+  const eyesType = pickTrait(walletHash, traits.eyes,3);
+  const mouthType = pickTrait(walletHash, traits.mouth,4);
+  const hairType = pickTrait(walletHash, traits.hair,5);
+  const accessory = pickTrait(walletHash, traits.accessories,6);
+  const aura = pickTrait(walletHash, traits.aura,7);
+
+  // Draw background
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Draw head
+  ctx.fillStyle='#FFE4C4';
+  const headX=4, headY=4, headW=8, headH=8;
+  ctx.fillRect(headX*pixelSize, headY*pixelSize, headW*pixelSize, headH*pixelSize);
+
+  // Draw eyes
+  ctx.fillStyle='#000';
+  switch(eyesType){
+    case 'happy':
+      ctx.fillRect(5*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      ctx.fillRect(8*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      break;
+    case 'angry':
+      ctx.fillRect(5*pixelSize,5*pixelSize,2*pixelSize,1*pixelSize);
+      ctx.fillRect(8*pixelSize,5*pixelSize,2*pixelSize,1*pixelSize);
+      break;
+    case 'sleepy':
+      ctx.fillRect(5*pixelSize,6*pixelSize,2*pixelSize,1*pixelSize);
+      ctx.fillRect(8*pixelSize,6*pixelSize,2*pixelSize,1*pixelSize);
+      break;
+    case 'googly':
+      ctx.fillRect(5*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      ctx.fillRect(6*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      ctx.fillRect(8*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      ctx.fillRect(9*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      break;
+    case 'winking':
+      ctx.fillRect(5*pixelSize,5*pixelSize,2*pixelSize,1*pixelSize);
+      ctx.fillRect(8*pixelSize,5*pixelSize,1*pixelSize,1*pixelSize);
+      break;
   }
+
+  // Draw mouth
+  ctx.fillStyle='#900';
+  switch(mouthType){
+    case 'grin': ctx.fillRect(6*pixelSize,8*pixelSize,3*pixelSize,1*pixelSize); break;
+    case 'frown': ctx.fillRect(6*pixelSize,9*pixelSize,3*pixelSize,1*pixelSize); break;
+    case 'smile': ctx.fillRect(6*pixelSize,9*pixelSize,3*pixelSize,1*pixelSize); break;
+    case 'tongue': ctx.fillRect(6*pixelSize,9*pixelSize,3*pixelSize,1*pixelSize);
+                   ctx.fillStyle='#F00'; ctx.fillRect(7*pixelSize,9*pixelSize,1*pixelSize,1*pixelSize); break;
+    case 'drooling': ctx.fillRect(6*pixelSize,9*pixelSize,3*pixelSize,1*pixelSize);
+                     ctx.fillStyle='#0FF'; ctx.fillRect(8*pixelSize,10*pixelSize,1*pixelSize,1*pixelSize); break;
+  }
+
+  // Hair
+  ctx.fillStyle='#000';
+  switch(hairType){
+    case 'mohawk': ctx.fillRect(7*pixelSize,3*pixelSize,2*pixelSize,1*pixelSize); break;
+    case 'spiky': ctx.fillRect(5*pixelSize,3*pixelSize,6*pixelSize,1*pixelSize); break;
+    case 'messy': ctx.fillRect(4*pixelSize,3*pixelSize,8*pixelSize,1*pixelSize); break;
+    case 'braid': ctx.fillRect(4*pixelSize,4*pixelSize,2*pixelSize,4*pixelSize); break;
+  }
+
+  // Accessories
+  ctx.fillStyle='gold';
+  if(accessory==='glasses'){ctx.fillRect(5*pixelSize,5*pixelSize,4*pixelSize,1*pixelSize);}
+  else if(accessory==='hat'){ctx.fillRect(4*pixelSize,2*pixelSize,8*pixelSize,2*pixelSize);}
+  else if(accessory==='earring'){ctx.fillRect(12*pixelSize,6*pixelSize,1*pixelSize,2*pixelSize);}
+  else if(accessory==='scar'){ctx.fillRect(6*pixelSize,7*pixelSize,2*pixelSize,1*pixelSize);}
+
+  // Aura
+  ctx.fillStyle='rgba(255,255,0,0.2)';
+  if(aura==='halo'){ctx.fillRect(5*pixelSize,2*pixelSize,6*pixelSize,1*pixelSize);}
+  else if(aura==='sparkles'){ctx.fillRect(0*pixelSize,0*pixelSize,1*pixelSize,1*pixelSize);}
+  else if(aura==='fire'){ctx.fillRect(0*pixelSize,0*pixelSize,16*pixelSize,1*pixelSize);}
+}
+
+// Solflare-friendly download
+function downloadNFT(){
+  const canvas=document.getElementById('pixelCanvas');
+  const imageData=canvas.toDataURL("image/png");
+  const newTab=window.open();
+  newTab.document.write(`<title>Your Sipp NFT</title><img src="${imageData}" style="max-width:100%;height:auto;display:block;margin:0 auto;" />`);
+}
+
+// Connect wallet
+async function connectSolflare(){
+  if(!window.solflare){alert('Install Solflare!'); window.open('https://solflare.com/','_blank'); return;}
   await window.solflare.connect();
-  wallet = window.solflare.publicKey.toString();
-  document.getElementById("connected").classList.remove("hidden");
-  generateSipp(wallet);
-};
-
-// ---------- SEED ----------
-function seedFromAddress(addr) {
-  let h = 0;
-  for (let i = 0; i < addr.length; i++) {
-    h = addr.charCodeAt(i) + ((h << 5) - h);
-  }
-  return Math.abs(h);
-}
-function rand(seed, min, max) {
-  const x = Math.sin(seed++) * 10000;
-  return Math.floor((x - Math.floor(x)) * (max - min)) + min;
-}
-
-// ---------- DRAW ----------
-function generateSipp(address) {
-  const canvas = document.getElementById("pfp");
-  const ctx = canvas.getContext("2d");
-  const seed = seedFromAddress(address);
-
-  ctx.clearRect(0,0,256,256);
-
-  // Background
-  const bgColors = ["#fde68a","#bfdbfe","#fecaca","#bbf7d0","#e9d5ff"];
-  ctx.fillStyle = bgColors[seed % bgColors.length];
-  ctx.fillRect(0,0,256,256);
-
-  // Head
-  const headColor = `hsl(${seed % 360},70%,65%)`;
-  ctx.fillStyle = headColor;
-  ctx.fillRect(64,80,128,128);
-
-  // Eyes
-  ctx.fillStyle = "#000";
-  const eyeType = seed % 6;
-  if (eyeType === 0) {
-    ctx.fillRect(92,120,12,12);
-    ctx.fillRect(152,120,12,12);
-  }
-  if (eyeType === 1) {
-    ctx.fillRect(90,118,20,20);
-    ctx.fillRect(146,118,20,20);
-  }
-  if (eyeType === 2) {
-    ctx.fillRect(100,122,8,8);
-    ctx.fillRect(148,122,8,8);
-  }
-  if (eyeType === 3) {
-    ctx.fillRect(92,120,12,12);
-    ctx.fillRect(152,120,12,12);
-    ctx.fillRect(122,112,12,12);
-  }
-  if (eyeType === 4) {
-    ctx.fillRect(92,120,12,4);
-    ctx.fillRect(152,120,12,4);
-  }
-  if (eyeType === 5) {
-    ctx.fillRect(96,120,6,12);
-    ctx.fillRect(154,120,6,12);
-  }
-
-  // Mouth
-  const mouthType = seed % 5;
-  if (mouthType === 0) ctx.fillRect(112,156,32,6);
-  if (mouthType === 1) ctx.fillRect(120,152,16,16);
-  if (mouthType === 2) ctx.fillRect(112,156,32,12);
-  if (mouthType === 3) {
-    ctx.fillRect(116,156,24,6);
-    ctx.fillRect(122,162,12,6);
-  }
-  if (mouthType === 4) {
-    ctx.fillRect(112,156,32,4);
-    ctx.fillRect(112,162,4,4);
-    ctx.fillRect(140,162,4,4);
-  }
-
-  // Accessory (chance)
-  if (seed % 4 === 0) {
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(80,112,40,32);
-    ctx.strokeRect(136,112,40,32);
-    ctx.beginPath();
-    ctx.moveTo(120,128);
-    ctx.lineTo(136,128);
-    ctx.stroke();
+  if(window.solflare.publicKey){
+    walletAddress=window.solflare.publicKey.toString();
+    currentProvider=window.solflare;
+    document.getElementById('walletAddress').textContent=walletAddress;
+    document.getElementById('notConnected').style.display='none';
+    document.getElementById('connected').style.display='block';
+    generatePixelArt(walletAddress);
   }
 }
 
-// ---------- DOWNLOAD ----------
-document.getElementById("download").onclick = () => {
-  const c = document.getElementById("pfp");
-  const a = document.createElement("a");
-  a.href = c.toDataURL();
-  a.download = "sipp.png";
-  a.click();
-};
+// Disconnect
+function disconnectWallet(){
+  if(currentProvider?.disconnect) currentProvider.disconnect();
+  walletAddress=null; currentProvider=null;
+  document.getElementById('notConnected').style.display='flex';
+  document.getElementById('connected').style.display='none';
+}
+
+// Event listeners
+document.getElementById('connectSolflareBtn').addEventListener('click',connectSolflare);
+document.getElementById('disconnectBtn').addEventListener('click',disconnectWallet);
+document.getElementById('downloadBtn').addEventListener('click',downloadNFT);
+document.getElementById('regenerateBtn').addEventListener('click',()=>{if(walletAddress){generatePixelArt(walletAddress);}});
 </script>
 </body>
 </html>
