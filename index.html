@@ -16,23 +16,29 @@
 <canvas id="canvas" width="200" height="200"></canvas>
 
 <script type="module">
-// Import Solflare adapter if hosted via npm or CDN
-import { SolflareWallet } from "https://cdn.jsdelivr.net/npm/@solflare-wallet/adapter/dist/solflare.js";
+import { SolflareWalletAdapter } from "https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-wallets@0.19.10/dist/index.browser.js";
+import { WalletAdapterNetwork } from "https://cdn.jsdelivr.net/npm/@solana/wallet-adapter-base@0.9.7/dist/index.browser.js";
 
 // Canvas setup
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-// Connect wallet
-const walletButton = document.getElementById("connectWallet");
 let walletAddress = "";
 
+// Initialize wallet adapter
+const solflare = new SolflareWalletAdapter({ network: WalletAdapterNetwork.Devnet, provider: window.solflare });
+
+const walletButton = document.getElementById("connectWallet");
 walletButton.addEventListener("click", async () => {
-    const wallet = new SolflareWallet();
-    await wallet.connect();
-    walletAddress = wallet.publicKey.toString();
-    alert("Connected wallet: " + walletAddress);
-    generatePixelArt(walletAddress);
+    try {
+        await solflare.connect();
+        walletAddress = solflare.publicKey.toString();
+        alert("Connected wallet: " + walletAddress);
+        generatePixelArt(walletAddress);
+    } catch (err) {
+        console.error(err);
+        alert("Failed to connect wallet. Make sure Solflare extension/app is installed.");
+    }
 });
 
 // Simple deterministic hash function from string
@@ -45,7 +51,6 @@ function hashStringToNumbers(str, max) {
 function generatePixelArt(walletAddr) {
     const size = 8; // 8x8 grid
     const pixelSize = canvas.width / size;
-
     const numbers = hashStringToNumbers(walletAddr, 255);
 
     // Clear canvas
@@ -60,7 +65,6 @@ function generatePixelArt(walletAddr) {
         }
     }
 }
-
 </script>
 </body>
 </html>
