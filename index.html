@@ -118,44 +118,399 @@ function disconnectWallet(){
     document.getElementById('connected').style.display = 'none';
 }
 
-// Pixel NFT generator
+// Seeded random number generator
+class Random {
+    constructor(seed) {
+        this.seed = seed;
+    }
+    next() {
+        this.seed = (this.seed * 9301 + 49297) % 233280;
+        return this.seed / 233280;
+    }
+    range(min, max) {
+        return Math.floor(this.next() * (max - min + 1)) + min;
+    }
+    pick(arr) {
+        return arr[Math.floor(this.next() * arr.length)];
+    }
+    chance(probability) {
+        return this.next() < probability;
+    }
+}
+
+// Pixel PFP generator with unique characters
 function generatePixelArt(address){
     const canvas = document.getElementById('pixelCanvas');
     const ctx = canvas.getContext('2d');
-    const gridSize = 16;
-    const pixelSize = 20;
-    canvas.width = gridSize*pixelSize;
-    canvas.height = gridSize*pixelSize;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    let hash=0;
-    for(let i=0;i<address.length;i++){
-        hash = address.charCodeAt(i)+((hash<<5)-hash);
+    const gridSize = 24;
+    const pixelSize = 16;
+    canvas.width = gridSize * pixelSize;
+    canvas.height = gridSize * pixelSize;
+    
+    // Create seeded random from wallet
+    let seed = 0;
+    for(let i = 0; i < address.length; i++){
+        seed = address.charCodeAt(i) + ((seed << 5) - seed);
     }
-    const hue = Math.abs(hash)%360;
-    const colors=[
-        `hsl(${hue},70%,60%)`,
-        `hsl(${(hue+30)%360},70%,50%)`,
-        `hsl(${(hue+60)%360},70%,55%)`,
-        `hsl(${(hue+90)%360},70%,45%)`,
-        `hsl(${(hue+120)%360},70%,50%)`
+    const rng = new Random(Math.abs(seed));
+    
+    // Background
+    const bgHue = rng.range(0, 360);
+    const bgColors = [
+        `hsl(${bgHue}, 70%, 60%)`,
+        `hsl(${(bgHue + 30) % 360}, 70%, 50%)`,
+        `hsl(${(bgHue + 60) % 360}, 70%, 55%)`
     ];
-
-    for(let y=0;y<gridSize;y++){
-        for(let x=0;x<gridSize;x++){
-            const index = y*gridSize + x;
-            const charCode = address.charCodeAt(index%address.length);
-            const actualX = x<gridSize/2 ? x : gridSize-1-x;
-            const seed=(charCode+actualX+y)%100;
-            if(seed>30){
-                const colorIndex=(charCode+actualX+y)%colors.length;
-                ctx.fillStyle=colors[colorIndex];
-                ctx.fillRect(x*pixelSize,y*pixelSize,pixelSize,pixelSize);
-                ctx.strokeStyle='rgba(0,0,0,0.1)';
-                ctx.strokeRect(x*pixelSize,y*pixelSize,pixelSize,pixelSize);
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGradient.addColorStop(0, bgColors[0]);
+    bgGradient.addColorStop(1, bgColors[1]);
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Skin tones
+    const skinTones = [
+        '#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', 
+        '#2ecc71', '#9b59b6', '#3498db', '#e74c3c', '#f39c12',
+        '#95a5a6', '#34495e', '#1abc9c', '#ff6b9d', '#c0392b'
+    ];
+    const skinColor = rng.pick(skinTones);
+    
+    // Head shape (10x12 pixels, centered, head and shoulders)
+    const headWidth = 10;
+    const headHeight = 10;
+    const startX = Math.floor((gridSize - headWidth) / 2);
+    const startY = 4;
+    
+    // Draw face/head base (symmetrical)
+    for(let y = 0; y < headHeight; y++){
+        for(let x = 0; x < headWidth; x++){
+            const mirrorX = x < headWidth / 2 ? x : headWidth - 1 - x;
+            if(y < 8){
+                // Head shape
+                if((y === 0 && mirrorX >= 2 && mirrorX <= 3) ||
+                   (y === 1 && mirrorX >= 1 && mirrorX <= 4) ||
+                   (y >= 2 && y <= 7 && mirrorX >= 0 && mirrorX <= 4)){
+                    drawPixel(ctx, startX + x, startY + y, skinColor, pixelSize);
+                }
             }
         }
     }
+    
+    // Shoulders (wider than head)
+    for(let y = 0; y < 4; y++){
+        for(let x = 0; x < 16; x++){
+            const shoulderY = startY + headHeight + y;
+            const shoulderX = startX - 3 + x;
+            if(y === 0 && x >= 2 && x <= 13){
+                drawPixel(ctx, shoulderX, shoulderY, skinColor, pixelSize);
+            } else if(y === 1 && x >= 1 && x <= 14){
+                drawPixel(ctx, shoulderX, shoulderY, darkenColor(skinColor, 20), pixelSize);
+            } else if(y >= 2 && x >= 0 && x <= 15){
+                drawPixel(ctx, shoulderX, shoulderY, darkenColor(skinColor, 30), pixelSize);
+            }
+        }
+    }
+    
+    // Hair styles (inspired by CryptoPunks, Bored Apes, etc.)
+    const hairStyles = ['mohawk', 'wild', 'cap', 'bandana', 'crown', 'horns', 'antenna', 'beanie', 'afro'];
+    const hairStyle = rng.pick(hairStyles);
+    const hairColors = ['#2c1810', '#8b4513', '#daa520', '#ff6347', '#00ff00', '#ff00ff', '#00ffff', '#ffff00'];
+    const hairColor = rng.pick(hairColors);
+    
+    drawHair(ctx, startX, startY, headWidth, hairStyle, hairColor, pixelSize, rng);
+    
+    // Eyes (weird and varied, inspired by NFT projects)
+    const eyeTypes = ['normal', 'laser', '3d', 'heart', 'dollar', 'x', 'spiral', 'robot', 'alien', 'cyclops'];
+    const eyeType = rng.pick(eyeTypes);
+    drawEyes(ctx, startX, startY, headWidth, eyeType, pixelSize, rng);
+    
+    // Mouth (varied expressions)
+    const mouthTypes = ['smile', 'frown', 'teeth', 'tongue', 'vampire', 'zipper', 'gold', 'rainbow', 'missing'];
+    const mouthType = rng.pick(mouthTypes);
+    drawMouth(ctx, startX, startY, headWidth, mouthType, pixelSize, rng);
+    
+    // Accessories (inspired by all NFT projects)
+    if(rng.chance(0.4)) drawAccessory(ctx, startX, startY, headWidth, pixelSize, rng);
+    
+    // Face details
+    if(rng.chance(0.3)) drawFaceDetail(ctx, startX, startY, headWidth, pixelSize, rng);
+}
+
+function drawPixel(ctx, x, y, color, size){
+    ctx.fillStyle = color;
+    ctx.fillRect(x * size, y * size, size, size);
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.strokeRect(x * size, y * size, size, size);
+}
+
+function drawHair(ctx, startX, startY, width, style, color, pxSize, rng){
+    const positions = [];
+    switch(style){
+        case 'mohawk':
+            for(let i = 0; i < 4; i++){
+                drawPixel(ctx, startX + 4, startY - 2 + i, color, pxSize);
+                drawPixel(ctx, startX + 5, startY - 2 + i, color, pxSize);
+            }
+            break;
+        case 'wild':
+            for(let x = 0; x < width; x++){
+                if(rng.chance(0.7)){
+                    drawPixel(ctx, startX + x, startY - 1, color, pxSize);
+                    if(rng.chance(0.5)) drawPixel(ctx, startX + x, startY - 2, color, pxSize);
+                }
+            }
+            break;
+        case 'cap':
+            for(let x = 2; x < 8; x++) drawPixel(ctx, startX + x, startY, color, pxSize);
+            for(let x = 1; x < 9; x++) drawPixel(ctx, startX + x, startY - 1, color, pxSize);
+            break;
+        case 'bandana':
+            for(let x = 1; x < 9; x++) drawPixel(ctx, startX + x, startY + 1, color, pxSize);
+            drawPixel(ctx, startX + 9, startY + 2, color, pxSize);
+            break;
+        case 'crown':
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, startY - 1, '#ffd700', pxSize);
+                if(x % 2 === 0) drawPixel(ctx, startX + x, startY - 2, '#ffd700', pxSize);
+            }
+            break;
+        case 'horns':
+            drawPixel(ctx, startX + 1, startY - 1, '#ff0000', pxSize);
+            drawPixel(ctx, startX + 1, startY - 2, '#ff0000', pxSize);
+            drawPixel(ctx, startX + 8, startY - 1, '#ff0000', pxSize);
+            drawPixel(ctx, startX + 8, startY - 2, '#ff0000', pxSize);
+            break;
+        case 'antenna':
+            drawPixel(ctx, startX + 4, startY - 3, color, pxSize);
+            drawPixel(ctx, startX + 5, startY - 3, color, pxSize);
+            drawPixel(ctx, startX + 4, startY - 4, '#ff00ff', pxSize);
+            drawPixel(ctx, startX + 5, startY - 4, '#ff00ff', pxSize);
+            break;
+        case 'beanie':
+            for(let y = -2; y < 1; y++){
+                for(let x = 1; x < 9; x++){
+                    drawPixel(ctx, startX + x, startY + y, color, pxSize);
+                }
+            }
+            drawPixel(ctx, startX + 4, startY - 3, color, pxSize);
+            drawPixel(ctx, startX + 5, startY - 3, color, pxSize);
+            break;
+        case 'afro':
+            for(let y = -2; y < 2; y++){
+                for(let x = 0; x < width; x++){
+                    if(Math.abs(x - width/2) + Math.abs(y) < 5){
+                        drawPixel(ctx, startX + x, startY + y, color, pxSize);
+                    }
+                }
+            }
+            break;
+    }
+}
+
+function drawEyes(ctx, startX, startY, width, type, pxSize, rng){
+    const leftEyeX = startX + 2;
+    const rightEyeX = startX + 7;
+    const eyeY = startY + 3;
+    
+    switch(type){
+        case 'normal':
+            drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
+            break;
+        case 'laser':
+            drawPixel(ctx, leftEyeX, eyeY, '#ff0000', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#ff0000', pxSize);
+            drawPixel(ctx, leftEyeX - 1, eyeY, '#ff0000', pxSize);
+            drawPixel(ctx, rightEyeX + 1, eyeY, '#ff0000', pxSize);
+            break;
+        case '3d':
+            drawPixel(ctx, leftEyeX, eyeY, '#00ffff', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#ff0000', pxSize);
+            break;
+        case 'heart':
+            drawPixel(ctx, leftEyeX, eyeY, '#ff1493', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#ff1493', pxSize);
+            break;
+        case 'dollar':
+            drawPixel(ctx, leftEyeX, eyeY, '#00ff00', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#00ff00', pxSize);
+            break;
+        case 'x':
+            drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, leftEyeX - 1, eyeY - 1, '#000', pxSize);
+            drawPixel(ctx, leftEyeX + 1, eyeY + 1, '#000', pxSize);
+            drawPixel(ctx, rightEyeX - 1, eyeY - 1, '#000', pxSize);
+            drawPixel(ctx, rightEyeX + 1, eyeY + 1, '#000', pxSize);
+            break;
+        case 'spiral':
+            drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, leftEyeX - 1, eyeY, '#666', pxSize);
+            drawPixel(ctx, rightEyeX + 1, eyeY, '#666', pxSize);
+            break;
+        case 'robot':
+            drawPixel(ctx, leftEyeX, eyeY, '#00ff00', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#00ff00', pxSize);
+            drawPixel(ctx, leftEyeX, eyeY - 1, '#00ff00', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY - 1, '#00ff00', pxSize);
+            break;
+        case 'alien':
+            drawPixel(ctx, leftEyeX - 1, eyeY, '#000', pxSize);
+            drawPixel(ctx, leftEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, rightEyeX, eyeY, '#000', pxSize);
+            drawPixel(ctx, rightEyeX + 1, eyeY, '#000', pxSize);
+            break;
+        case 'cyclops':
+            drawPixel(ctx, startX + 4, eyeY, '#ff0000', pxSize);
+            drawPixel(ctx, startX + 5, eyeY, '#ff0000', pxSize);
+            break;
+    }
+}
+
+function drawMouth(ctx, startX, startY, width, type, pxSize, rng){
+    const mouthY = startY + 6;
+    const mouthCenterX = startX + Math.floor(width / 2);
+    
+    switch(type){
+        case 'smile':
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, mouthY, '#000', pxSize);
+            }
+            break;
+        case 'frown':
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, mouthY + 1, '#000', pxSize);
+            }
+            break;
+        case 'teeth':
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, mouthY, '#fff', pxSize);
+                drawPixel(ctx, startX + x, mouthY - 1, '#000', pxSize);
+            }
+            break;
+        case 'tongue':
+            for(let x = 3; x < 7; x++){
+                drawPixel(ctx, startX + x, mouthY, '#ff69b4', pxSize);
+            }
+            drawPixel(ctx, startX + 4, mouthY + 1, '#ff69b4', pxSize);
+            drawPixel(ctx, startX + 5, mouthY + 1, '#ff69b4', pxSize);
+            break;
+        case 'vampire':
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, mouthY, '#000', pxSize);
+            }
+            drawPixel(ctx, startX + 3, mouthY + 1, '#fff', pxSize);
+            drawPixel(ctx, startX + 6, mouthY + 1, '#fff', pxSize);
+            break;
+        case 'zipper':
+            for(let x = 3; x < 7; x++){
+                drawPixel(ctx, startX + x, mouthY, '#888', pxSize);
+            }
+            break;
+        case 'gold':
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, mouthY, '#ffd700', pxSize);
+            }
+            break;
+        case 'rainbow':
+            const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082'];
+            for(let x = 2; x < 8; x++){
+                drawPixel(ctx, startX + x, mouthY, colors[(x - 2) % colors.length], pxSize);
+            }
+            break;
+        case 'missing':
+            drawPixel(ctx, startX + 3, mouthY, '#000', pxSize);
+            drawPixel(ctx, startX + 6, mouthY, '#000', pxSize);
+            break;
+    }
+}
+
+function drawAccessory(ctx, startX, startY, width, pxSize, rng){
+    const accessories = ['glasses', 'sunglasses', 'monocle', 'cigarette', 'pipe', 'earring'];
+    const accessory = rng.pick(accessories);
+    
+    switch(accessory){
+        case 'glasses':
+            drawPixel(ctx, startX + 1, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 2, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 3, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 6, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 7, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 8, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 4, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 5, startY + 3, '#000', pxSize);
+            break;
+        case 'sunglasses':
+            drawPixel(ctx, startX + 2, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 3, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 6, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 7, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 4, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 5, startY + 3, '#000', pxSize);
+            break;
+        case 'monocle':
+            drawPixel(ctx, startX + 2, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 3, startY + 3, '#000', pxSize);
+            drawPixel(ctx, startX + 2, startY + 4, '#000', pxSize);
+            drawPixel(ctx, startX + 3, startY + 4, '#000', pxSize);
+            break;
+        case 'cigarette':
+            drawPixel(ctx, startX + 6, startY + 5, '#fff', pxSize);
+            drawPixel(ctx, startX + 7, startY + 5, '#fff', pxSize);
+            drawPixel(ctx, startX + 8, startY + 5, '#ff6347', pxSize);
+            break;
+        case 'pipe':
+            drawPixel(ctx, startX + 6, startY + 6, '#8b4513', pxSize);
+            drawPixel(ctx, startX + 7, startY + 6, '#8b4513', pxSize);
+            drawPixel(ctx, startX + 7, startY + 5, '#8b4513', pxSize);
+            break;
+        case 'earring':
+            drawPixel(ctx, startX + 1, startY + 5, '#ffd700', pxSize);
+            drawPixel(ctx, startX + 8, startY + 5, '#ffd700', pxSize);
+            break;
+    }
+}
+
+function drawFaceDetail(ctx, startX, startY, width, pxSize, rng){
+    const details = ['scar', 'freckles', 'tattoo', 'blush', 'nose_ring'];
+    const detail = rng.pick(details);
+    
+    switch(detail){
+        case 'scar':
+            drawPixel(ctx, startX + 7, startY + 2, '#8b0000', pxSize);
+            drawPixel(ctx, startX + 7, startY + 3, '#8b0000', pxSize);
+            drawPixel(ctx, startX + 7, startY + 4, '#8b0000', pxSize);
+            break;
+        case 'freckles':
+            drawPixel(ctx, startX + 3, startY + 4, '#a0522d', pxSize);
+            drawPixel(ctx, startX + 6, startY + 4, '#a0522d', pxSize);
+            drawPixel(ctx, startX + 2, startY + 5, '#a0522d', pxSize);
+            drawPixel(ctx, startX + 7, startY + 5, '#a0522d', pxSize);
+            break;
+        case 'tattoo':
+            drawPixel(ctx, startX + 1, startY + 4, '#000', pxSize);
+            drawPixel(ctx, startX + 1, startY + 5, '#000', pxSize);
+            break;
+        case 'blush':
+            drawPixel(ctx, startX + 1, startY + 5, '#ff69b4', pxSize);
+            drawPixel(ctx, startX + 8, startY + 5, '#ff69b4', pxSize);
+            break;
+        case 'nose_ring':
+            drawPixel(ctx, startX + 5, startY + 5, '#c0c0c0', pxSize);
+            break;
+    }
+}
+
+function darkenColor(color, percent){
+    const num = parseInt(color.replace('#',''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) - amt;
+    const G = (num >> 8 & 0x00FF) - amt;
+    const B = (num & 0x0000FF) - amt;
+    return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
+        (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
+        .toString(16).slice(1);
 }
 
 // Convert dataURL to blob
