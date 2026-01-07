@@ -19,7 +19,7 @@
 
   <button id="connectBtn"
     class="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-semibold hover:scale-105 transition">
-    Connect Phantom
+    Connect Solflare
   </button>
 
   <div id="pfp" class="mt-6 hidden">
@@ -43,14 +43,16 @@ const GRID = 16;
 
 let wallet = null;
 
-// ---- WALLET ----
+// ---- WALLET (SOLFLARE ONLY) ----
 document.getElementById("connectBtn").onclick = async () => {
-  if (!window.solana || !window.solana.isPhantom) {
-    alert("Install Phantom Wallet");
+  if (!window.solflare) {
+    alert("Install Solflare Wallet");
+    window.open("https://solflare.com", "_blank");
     return;
   }
-  const res = await window.solana.connect();
-  wallet = res.publicKey.toString();
+
+  await window.solflare.connect();
+  wallet = window.solflare.publicKey.toString();
   document.getElementById("pfp").classList.remove("hidden");
   generatePFP(wallet);
 };
@@ -115,7 +117,6 @@ function generatePFP(address) {
   ctx.fillStyle = eyeType === 1 ? laser : dark;
 
   if (eyeType === 2) {
-    // sleepy
     ctx.fillRect(eyeX*SIZE,eyeY*SIZE,SIZE*2,SIZE/2);
     ctx.fillRect((GRID-eyeX-2)*SIZE,eyeY*SIZE,SIZE*2,SIZE/2);
   } else {
@@ -127,27 +128,24 @@ function generatePFP(address) {
   const mood = seed % 3;
   ctx.fillStyle = dark;
   if (mood === 0)
-    ctx.fillRect(7*SIZE,9*SIZE,2*SIZE,SIZE/2); // smile
+    ctx.fillRect(7*SIZE,9*SIZE,2*SIZE,SIZE/2);
   if (mood === 1)
-    ctx.fillRect(7*SIZE,9*SIZE,2*SIZE,SIZE/4); // neutral
+    ctx.fillRect(7*SIZE,9*SIZE,2*SIZE,SIZE/4);
   if (mood === 2)
-    ctx.fillRect(7*SIZE,10*SIZE,2*SIZE,SIZE/2); // sad
+    ctx.fillRect(7*SIZE,10*SIZE,2*SIZE,SIZE/2);
 
   // ---- ACCESSORIES ----
   if (seed % 3 === 0) {
-    // earring
     ctx.fillStyle = accent;
     ctx.fillRect(3*SIZE,8*SIZE,SIZE/2,SIZE);
   }
 
   if (seed % 7 === 0) {
-    // scar
     ctx.fillStyle = dark;
     ctx.fillRect(8*SIZE,6*SIZE,SIZE/4,2*SIZE);
   }
 
   if (seed % 9 === 0) {
-    // glasses
     ctx.strokeStyle = dark;
     ctx.lineWidth = 2;
     ctx.strokeRect(3*SIZE,5*SIZE,3*SIZE,2*SIZE);
