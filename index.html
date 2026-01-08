@@ -1,199 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sipp - Your Pixels, Your Identity</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-body { margin: 0; padding: 0; }
-.pixelated { image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Sipp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+  </style>
 </head>
-<body>
-<div id="app" class="min-h-screen bg-gradient-to-br from-yellow-200 via-pink-200 to-purple-300 flex items-center justify-center p-4">
-    <div class="max-w-2xl w-full bg-white/20 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/30">
-        <div class="text-center mb-6">
-            <h1 class="text-5xl font-bold text-purple-900 mb-1">Sipp</h1>
-            <p class="text-purple-800 italic text-lg">Your pixels, your identity</p>
-        </div>
 
-        <!-- Not Connected -->
-        <div id="notConnected" class="flex flex-col items-center space-y-6">
-            <div class="flex flex-col gap-3 w-full max-w-sm">
-                <button id="connectSolflareBtn"
-                    class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
-                    Connect Solflare Wallet
-                </button>
-            </div>
-            <div id="walletStatus" class="text-sm text-yellow-800 mt-2"></div>
-        </div>
+<body class="min-h-screen bg-gradient-to-br from-pink-200 via-purple-200 to-blue-200 flex items-center justify-center p-4">
 
-        <!-- Connected -->
-        <div id="connected" class="space-y-6" style="display: none;">
-            <div class="bg-white/10 rounded-lg p-4 border border-white/20">
-                <p class="text-sm text-purple-800 mb-1">Your Wallet</p>
-                <p id="walletAddress" class="text-purple-900 font-mono text-sm break-all"></p>
-            </div>
+<div class="bg-white rounded-3xl shadow-xl max-w-md w-full p-6 text-center">
 
-            <div class="flex flex-col items-center space-y-4">
-                <div class="bg-white/10 p-6 rounded-xl border-4 border-white/20 shadow-2xl">
-                    <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
-                </div>
+  <!-- LANDING -->
+  <h1 class="text-4xl font-black mb-2">Sipp</h1>
+  <p class="text-gray-600 mb-6">Your pixels, your identity</p>
 
-                <div id="downloadLinkContainer" class="w-full bg-white/10 rounded-lg p-4 border border-white/20" style="display: none;">
-                    <p class="text-sm text-purple-800 mb-2 font-semibold">Your NFT Download Link:</p>
-                    <div class="flex gap-2">
-                        <input id="downloadLinkInput" type="text" readonly class="flex-1 px-3 py-2 bg-white/50 rounded border border-purple-300 text-purple-900 font-mono text-xs break-all" />
-                        <button id="copyLinkBtn" class="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded transition-all duration-200">
-                            Copy
-                        </button>
-                    </div>
-                    <p class="text-xs text-purple-700 mt-2">📋 Copy this link and paste it in Chrome/Safari to download your Sipp!</p>
-                </div>
+  <!-- CONNECT -->
+  <button id="connectBtn"
+    class="w-full py-3 bg-black text-white rounded-xl font-semibold mb-4">
+    Connect Wallet
+  </button>
 
-                <button id="downloadBtn"
-                    class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                    Generate Download Link
-                </button>
+  <!-- AVATAR -->
+  <div id="reveal" class="hidden">
+    <canvas id="pfp" width="256" height="256" class="mx-auto rounded-xl border-4 border-black mb-4"></canvas>
 
-                <button id="regenerateBtn" class="text-sm text-purple-800 hover:text-purple-700 underline">
-                    Regenerate
-                </button>
-
-                <button id="disconnectBtn"
-                    class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                    Disconnect
-                </button>
-
-                <!-- Support the Build -->
-                <div class="flex flex-col items-center space-y-2 mt-4 bg-white/10 rounded-lg p-4 border border-white/20">
-                    <p class="text-purple-800 font-semibold">💖 Support the Build</p>
-                    <input
-                        id="supportAmount"
-                        type="number"
-                        min="0.001"
-                        step="0.001"
-                        placeholder="Amount (SOL)"
-                        class="px-3 py-2 w-40 rounded border border-purple-300 text-purple-900 font-mono text-sm text-center"
-                    />
-                    <button
-                        id="supportBtn"
-                        class="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
-                    >
-                        Send Support
-                    </button>
-                </div>
-
-            </div>
-        </div>
+    <!-- METADATA -->
+    <div class="text-sm text-left bg-gray-100 rounded-xl p-3 mb-4">
+      <p><strong>Sipp ID:</strong> <span id="sippId"></span></p>
+      <p><strong>Origin:</strong> Wallet-bound</p>
+      <p><strong>Status:</strong> Unchanged</p>
     </div>
+
+    <!-- FLOW -->
+    <button id="downloadBtn"
+      class="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold mb-3">
+      Download
+    </button>
+
+    <button id="supportBtn"
+      class="w-full py-3 bg-green-600 text-white rounded-xl font-semibold">
+      Support the Build
+    </button>
+  </div>
+
 </div>
 
 <script>
 let walletAddress = null;
-let currentProvider = null;
+const DESTINATION = "FQQRbHAgKUQjV2uWxx56a6GTGQLEdvQCoCAT52LGCmD";
 
-window.addEventListener('load', async () => {
-    await new Promise(r => setTimeout(r, 500));
-    const hasSolflare = window.solflare;
-    const statusEl = document.getElementById('walletStatus');
-    if(!hasSolflare){
-        statusEl.textContent = '⚠️ Solflare wallet not detected. Please install Solflare extension.';
-        statusEl.classList.add('text-red-700');
-    } else {
-        statusEl.textContent = '✅ Solflare detected! Click to connect.';
-        statusEl.classList.add('text-green-700');
-    }
-});
+// CONNECT
+document.getElementById("connectBtn").onclick = async () => {
+  if (!window.solflare) {
+    alert("Please open in Solflare browser");
+    return;
+  }
+  const res = await window.solflare.connect();
+  walletAddress = window.solflare.publicKey.toString();
+  document.getElementById("connectBtn").style.display = "none";
+  document.getElementById("reveal").classList.remove("hidden");
+  generateSipp(walletAddress);
+};
 
-async function connectSolflare(){
-    try{
-        if(!window.solflare){
-            alert('Please install Solflare wallet extension first!');
-            window.open('https://solflare.com/', '_blank');
-            return;
-        }
-        await window.solflare.connect();
-        if(window.solflare.publicKey){
-            walletAddress = window.solflare.publicKey.toString();
-            currentProvider = window.solflare;
-            document.getElementById('walletAddress').textContent = walletAddress;
-            document.getElementById('notConnected').style.display = 'none';
-            document.getElementById('connected').style.display = 'block';
-            generatePixelArt(walletAddress);
-        } else { alert('Failed to get wallet address.'); }
-    } catch(e){ console.error(e); alert('Failed to connect wallet.'); }
+// DETERMINISTIC HASH
+function hash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
 }
 
-function disconnectWallet(){
-    try{ if(currentProvider && currentProvider.disconnect){ currentProvider.disconnect(); } } catch(e){ console.error(e); }
-    walletAddress = null;
-    currentProvider = null;
-    document.getElementById('notConnected').style.display = 'flex';
-    document.getElementById('connected').style.display = 'none';
-    document.getElementById('downloadLinkContainer').style.display = 'none';
+// GENERATE CHARACTER
+function generateSipp(address) {
+  const seed = hash(address);
+  const ctx = document.getElementById("pfp").getContext("2d");
+  ctx.clearRect(0,0,256,256);
+
+  const rnd = n => (seed >> n) & 255;
+
+  const skin = `hsl(${rnd(1)%360},60%,70%)`;
+  const eye = rnd(2)%2 ? "■" : "●";
+  const mouth = rnd(3)%2 ? "_" : "ᴗ";
+  const accessory = rnd(4)%3;
+
+  // background
+  ctx.fillStyle = `hsl(${rnd(5)%360},70%,85%)`;
+  ctx.fillRect(0,0,256,256);
+
+  // head
+  ctx.fillStyle = skin;
+  ctx.fillRect(64,32,128,128);
+
+  // shoulders
+  ctx.fillStyle = `hsl(${rnd(6)%360},40%,50%)`;
+  ctx.fillRect(48,160,160,64);
+
+  // eyes
+  ctx.fillStyle = "#000";
+  ctx.font = "32px monospace";
+  ctx.fillText(eye, 96, 112);
+  ctx.fillText(eye, 128, 112);
+
+  // mouth
+  ctx.fillText(mouth, 112, 144);
+
+  // accessory
+  if (accessory === 1) {
+    ctx.fillStyle = "gold";
+    ctx.fillRect(80,16,96,16); // halo
+  }
+  if (accessory === 2) {
+    ctx.fillStyle = "black";
+    ctx.fillRect(88,80,80,24); // shades
+  }
+
+  // ID
+  document.getElementById("sippId").textContent =
+    "#" + seed.toString(16).slice(0,4).toUpperCase();
 }
 
-// Random generator
-class Random {
-    constructor(seed){ this.seed = seed; }
-    next(){ this.seed = (this.seed * 9301 + 49297) % 233280; return this.seed / 233280; }
-    range(min,max){ return Math.floor(this.next()*(max-min+1))+min; }
-    pick(arr){ return arr[Math.floor(this.next()*arr.length)]; }
-    chance(prob){ return this.next()<prob; }
-}
+// DOWNLOAD (opens browser)
+document.getElementById("downloadBtn").onclick = () => {
+  const canvas = document.getElementById("pfp");
+  const url = canvas.toDataURL("image/png");
+  window.open(url, "_blank");
+};
 
-// Pixel generation (simplified for brevity; keep your previous hair, eyes, mouth, accessories code here)
-function generatePixelArt(address){
-    const canvas = document.getElementById('pixelCanvas');
-    const ctx = canvas.getContext('2d');
-    const gridSize = 24; const pixelSize = 16;
-    canvas.width = gridSize*pixelSize; canvas.height = gridSize*pixelSize;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    let seed=0; for(let i=0;i<address.length;i++){ seed=address.charCodeAt(i)+((seed<<5)-seed); }
-    const rng = new Random(Math.abs(seed));
-    ctx.fillStyle = `hsl(${rng.range(0,360)},70%,60%)`;
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle='#ffdbac'; ctx.fillRect(8*pixelSize,4*pixelSize,10*pixelSize,10*pixelSize); // head
-    // Keep your detailed hair/eyes/mouth/accessories code from previous version here
-}
+// SUPPORT THE BUILD
+document.getElementById("supportBtn").onclick = async () => {
+  const amount = prompt("Enter SOL amount to support");
+  if (!amount) return;
 
-// Canvas download
-function dataURLtoBlob(dataurl){ const arr=dataurl.split(','); const mime=arr[0].match(/:(.*?);/)[1]; const bstr=atob(arr[1]); let n=bstr.length; const u8arr=new Uint8Array(n); while(n--){ u8arr[n]=bstr.charCodeAt(n); } return new Blob([u8arr],{type:mime}); }
-function downloadNFT(){
-    const canvas=document.getElementById('pixelCanvas');
-    const linkContainer=document.getElementById('downloadLinkContainer');
-    const linkInput=document.getElementById('downloadLinkInput');
-    if(!canvas){ alert('Canvas not found.'); return; }
-    try{
-        const imageData=canvas.toDataURL('image/png');
-        const blob=dataURLtoBlob(imageData);
-        const url=URL.createObjectURL(blob);
-        linkInput.value=url; linkContainer.style.display='block';
-        const isSolflare=/Solflare/i.test(navigator.userAgent);
-        if(isSolflare){ alert('⚠️ Copy the link and open in Chrome/Safari to download your Sipp!'); } 
-        else { window.open(url,'_blank'); }
-    }catch(e){ console.error(e); alert('Failed to generate download link.'); }
-}
-
-// Copy link
-function copyLink(){ const linkInput=document.getElementById('downloadLinkInput'); try{ linkInput.select(); linkInput.setSelectionRange(0,99999); document.execCommand('copy'); const btn=document.getElementById('copyLinkBtn'); const t=btn.textContent; btn.textContent='✓ Copied!'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-purple-500'); setTimeout(()=>{btn.textContent=t; btn.classList.remove('bg-green-500'); btn.classList.add('bg-purple-500');},2000); } catch(e){ alert('Failed to copy.'); } }
-
-// Support the Build
-document.getElementById('supportBtn').addEventListener('click',()=>{
-    const amount=parseFloat(document.getElementById('supportAmount').value);
-    if(!amount || amount<=0){ alert("Enter valid SOL amount"); return; }
-    const wallet="YOUR_SOLANA_WALLET_ADDRESS"; // <-- replace with your wallet
-    window.location.href=`solana:${wallet}?amount=${amount}`;
-});
-
-// Event listeners
-document.getElementById('connectSolflareBtn').addEventListener('click', connectSolflare);
-document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
-document.getElementById('downloadBtn').addEventListener('click', downloadNFT);
-document.getElementById('copyLinkBtn').addEventListener('click', copyLink);
-document.getElementById('regenerateBtn').addEventListener('click',()=>{ if(walletAddress){ document.getElementById('downloadLinkContainer').style.display='none'; generatePixelArt(walletAddress); } else{ alert('Connect wallet first'); } });
+  try {
+    await window.solflare.request({
+      method: "transfer",
+      params: {
+        recipient: DESTINATION,
+        amount: parseFloat(amount)
+      }
+    });
+    alert("Thank you for supporting Sipp 💜");
+  } catch (e) {
+    alert("Transaction cancelled");
+  }
+};
 </script>
+
 </body>
 </html>
