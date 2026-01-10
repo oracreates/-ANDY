@@ -3,186 +3,162 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sipp - Your Pixels, Your Identity</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Sipp Metaverse Demo</title>
 <style>
-body { margin: 0; padding: 0; }
-.pixelated {
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-}
+  body { margin:0; overflow:hidden; font-family: monospace; background:#222;}
+  #info { position: absolute; top: 10px; left: 10px; color: white; z-index: 10; }
+  #canvasContainer { width: 100vw; height: 100vh; display:block; }
+  #inventory { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display:flex; gap:5px; z-index:10;}
+  .block-slot { width: 40px; height: 40px; border: 2px solid white; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .block-slot.selected { border-color: yellow; }
 </style>
 </head>
 <body>
-<div id="app" class="min-h-screen bg-gradient-to-br from-yellow-200 via-pink-200 to-purple-300 flex items-center justify-center p-4">
-    <div class="max-w-2xl w-full bg-white/20 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/30">
+<div id="info">Use WASD + Mouse to move. Left click = break block, Right click = place block</div>
+<div id="inventory"></div>
+<div id="canvasContainer"></div>
 
-        <!-- Landing / Input -->
-        <div id="landing" class="flex flex-col items-center space-y-6">
-            <div class="text-center mb-6">
-                <h1 class="text-5xl font-bold text-purple-900 mb-1">Sipp</h1>
-                <p class="text-purple-800 italic text-lg">Your pixels, your identity</p>
-            </div>
-
-            <input id="walletInput" type="text" placeholder="Paste your wallet address here"
-                class="w-full max-w-md px-4 py-3 rounded-lg border border-purple-400 text-purple-900 font-mono" />
-
-            <button id="generateBtn"
-                class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
-                Reveal Your Sipp
-            </button>
-
-            <p id="inputError" class="text-red-700 text-sm mt-2 hidden">Please enter a valid wallet address.</p>
-        </div>
-
-        <!-- Connected / Generated -->
-        <div id="generated" class="space-y-6" style="display:none;">
-            <div class="bg-white/10 rounded-lg p-4 border border-white/20">
-                <p class="text-sm text-purple-800 mb-1">Wallet Address</p>
-                <p id="walletAddress" class="text-purple-900 font-mono text-sm break-all"></p>
-            </div>
-
-            <div class="flex flex-col items-center space-y-4">
-                <div class="bg-white/10 p-6 rounded-xl border-4 border-white/20 shadow-2xl">
-                    <canvas id="pixelCanvas" class="rounded-lg pixelated"></canvas>
-                </div>
-
-                <div id="sippFacts" class="bg-white/10 rounded-lg p-4 border border-white/20">
-                    <p>Sipp ID: <span id="sippId"></span></p>
-                    <p>Origin: Wallet-bound</p>
-                    <p>Status: Unchanged</p>
-                </div>
-
-                <div id="downloadLinkContainer" class="w-full bg-white/10 rounded-lg p-4 border border-white/20" style="display: none;">
-                    <p class="text-sm text-purple-800 mb-2 font-semibold">Your NFT Download Link:</p>
-                    <div class="flex gap-2">
-                        <input id="downloadLinkInput" type="text" readonly class="flex-1 px-3 py-2 bg-white/50 rounded border border-purple-300 text-purple-900 font-mono text-xs break-all" />
-                        <button id="copyLinkBtn" class="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded transition-all duration-200">
-                            Copy
-                        </button>
-                    </div>
-                    <p class="text-xs text-purple-700 mt-2">📋 Copy this link and paste it in Chrome/Safari address bar to download your Sipp!</p>
-                </div>
-
-                <button id="downloadBtn"
-                    class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                    Generate Download Link
-                </button>
-
-                <!-- New Seedless Wallet Button -->
-                <button id="seedlessBtn"
-                    class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                    Create Seedless Wallet
-                </button>
-
-                <button id="regenerateBtn" class="text-sm text-purple-800 hover:text-purple-700 underline">
-                    Regenerate
-                </button>
-
-                <button id="supportBuildBtn"
-                    class="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                    Support the Build
-                </button>
-            </div>
-        </div>
-
-    </div>
-</div>
-
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/examples/js/controls/PointerLockControls.js"></script>
 <script>
-// --- Globals ---
-let walletAddress = null;
+// --- Setup scene ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
 
-// --- Event Listeners ---
-document.getElementById('generateBtn').addEventListener('click', () => {
-    const input = document.getElementById('walletInput').value.trim();
-    if(input.length < 32){ // simple validation
-        document.getElementById('inputError').style.display = 'block';
-        return;
-    }
-    document.getElementById('inputError').style.display = 'none';
-    walletAddress = input;
-    document.getElementById('walletAddress').textContent = walletAddress;
-    document.getElementById('sippId').textContent = '#' + Math.floor(Math.random()*10000).toString(16).toUpperCase();
-    document.getElementById('landing').style.display = 'none';
-    document.getElementById('generated').style.display = 'block';
-    generatePixelArt(walletAddress);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 2, 5);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('canvasContainer').appendChild(renderer.domElement);
+
+// --- Lighting ---
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5,10,5);
+scene.add(light);
+
+// --- Controls ---
+const controls = new THREE.PointerLockControls(camera, renderer.domElement);
+document.body.addEventListener('click', ()=>{controls.lock()});
+const velocity = new THREE.Vector3();
+let direction = new THREE.Vector3();
+let moveForward=false, moveBackward=false, moveLeft=false, moveRight=false, canJump=false;
+
+document.addEventListener('keydown',(e)=>{
+  if(e.code==='KeyW') moveForward=true;
+  if(e.code==='KeyS') moveBackward=true;
+  if(e.code==='KeyA') moveLeft=true;
+  if(e.code==='KeyD') moveRight=true;
+  if(e.code==='Space' && canJump){ velocity.y += 5; canJump=false; }
+});
+document.addEventListener('keyup',(e)=>{
+  if(e.code==='KeyW') moveForward=false;
+  if(e.code==='KeyS') moveBackward=false;
+  if(e.code==='KeyA') moveLeft=false;
+  if(e.code==='KeyD') moveRight=false;
 });
 
-document.getElementById('regenerateBtn').addEventListener('click', () => {
-    if(walletAddress) generatePixelArt(walletAddress);
-});
-
-document.getElementById('downloadBtn').addEventListener('click', downloadNFT);
-
-document.getElementById('copyLinkBtn').addEventListener('click', () => {
-    const linkInput = document.getElementById('downloadLinkInput');
-    linkInput.select();
-    linkInput.setSelectionRange(0,99999);
-    document.execCommand('copy');
-    alert('Copied link!');
-});
-
-// --- New Seedless Wallet Integration ---
-document.getElementById('seedlessBtn').addEventListener('click', () => {
-    if(!walletAddress){
-        alert("Generate your Sipp first!");
-        return;
-    }
-    // open seedless wallet page in new tab with walletAddress as query param
-    const seedlessUrl = `https://seedless.up.railway.app?address=${walletAddress}`;
-    window.open(seedlessUrl, "_blank");
-});
-
-// --- Pixel Art Logic ---
-class Random { constructor(seed){ this.seed=seed; } next(){ this.seed=(this.seed*9301+49297)%233280; return this.seed/233280; } range(min,max){ return Math.floor(this.next()*(max-min+1))+min; } pick(arr){ return arr[Math.floor(this.next()*arr.length)]; } chance(p){ return this.next()<p; } }
-function generatePixelArt(address){
-    const canvas = document.getElementById('pixelCanvas');
-    const ctx = canvas.getContext('2d');
-    const gridSize=24, pixelSize=16;
-    canvas.width=gridSize*pixelSize; canvas.height=gridSize*pixelSize;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    let seed=0; for(let i=0;i<address.length;i++) seed=address.charCodeAt(i)+((seed<<5)-seed);
-    const rng=new Random(Math.abs(seed));
-
-    const bgHue=rng.range(0,360);
-    const bgGradient=ctx.createLinearGradient(0,0,0,canvas.height);
-    bgGradient.addColorStop(0,`hsl(${bgHue},70%,60%)`);
-    bgGradient.addColorStop(1,`hsl(${(bgHue+30)%360},70%,50%)`);
-    ctx.fillStyle=bgGradient; ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    const skinColors=['#8d5524','#c68642','#e0ac69','#f1c27d','#ffdbac','#2ecc71','#9b59b6','#3498db','#e74c3c','#f39c12','#95a5a6','#34495e','#1abc9c','#ff6b9d','#c0392b'];
-    const skin=rng.pick(skinColors);
-
-    const headW=10, headH=10, startX=Math.floor((gridSize-headW)/2), startY=4;
-    for(let y=0;y<headH;y++) for(let x=0;x<headW;x++){ const mx=x<headW/2?x:headW-1-x; if(y<8){ if((y===0&&mx>=2&&mx<=3)||(y===1&&mx>=1&&mx<=4)||(y>=2&&y<=7&&mx>=0&&mx<=4)) drawPixel(ctx,startX+x,startY+y,skin,pixelSize); } }
-
-    const shoulderStart=startY+headH;
-    for(let y=0;y<4;y++) for(let x=0;x<16;x++){ const sx=startX-3+x,sy=shoulderStart+y; if(y===0&&x>=2&&x<=13) drawPixel(ctx,sx,sy,skin,pixelSize); else if(y===1&&x>=1&&x<=14) drawPixel(ctx,sx,sy,darkenColor(skin,15),pixelSize); else if(y>=2&&x>=0&&x<=15) drawPixel(ctx,sx,sy,darkenColor(skin,25),pixelSize); }
-
-    const hairColors=['#2c1810','#8b4513','#daa520','#ff6347','#00ff00','#ff00ff','#00ffff','#ffff00'];
-    const hair=rng.pick(hairColors);
-    for(let x=0;x<10;x++) if(rng.chance(0.7)) drawPixel(ctx,startX+x,startY-1,hair,pixelSize);
-    drawPixel(ctx,startX+2,startY+3,'#000',pixelSize); drawPixel(ctx,startX+7,startY+3,'#000',pixelSize);
-    for(let x=2;x<8;x++) drawPixel(ctx,startX+x,startY+6,'#000',pixelSize);
+// --- Ground ---
+const blockSize = 1;
+const ground = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+const groundMat = new THREE.MeshLambertMaterial({color:0x228B22});
+for(let x=-10;x<=10;x++){
+  for(let z=-10;z<=10;z++){
+    const cube = new THREE.Mesh(ground, groundMat);
+    cube.position.set(x*blockSize,0,z*blockSize);
+    scene.add(cube);
+  }
 }
 
-// helpers
-function drawPixel(ctx,x,y,color,size){ctx.fillStyle=color;ctx.fillRect(x*size,y*size,size,size);}
-function darkenColor(color,p){const n=parseInt(color.replace('#',''),16);const a=Math.round(2.55*p);const R=Math.max(0,Math.min(255,(n>>16)-a)),G=Math.max(0,Math.min(255,(n>>8&0x00FF)-a)),B=Math.max(0,Math.min(255,(n&0x0000FF)-a));return '#'+(0x1000000+R*0x10000+G*0x100+B).toString(16).slice(1);}
-function dataURLtoBlob(dataurl){const arr=dataurl.split(','), mime=arr[0].match(/:(.*?);/)[1];let n=bstr.length;const u8arr=new Uint8Array(n);while(n--) u8arr[n]=bstr.charCodeAt(n);return new Blob([u8arr],{type:mime});}
-
-// download NFT
-function downloadNFT(){
-    const canvas=document.getElementById('pixelCanvas');
-    const imageData=canvas.toDataURL('image/png');
-    const blob=dataURLtoBlob(imageData);
-    const url=URL.createObjectURL(blob);
-    document.getElementById('downloadLinkInput').value=url;
-    document.getElementById('downloadLinkContainer').style.display='block';
+// --- Player Avatar (Sipp Pixel) ---
+let walletAddress = prompt("Enter your wallet address to generate Sipp avatar:");
+function generatePixelColor(addr){
+  let hash=0; for(let i=0;i<addr.length;i++) hash=addr.charCodeAt(i)+(hash<<5)-hash;
+  const colors=[0xff0000,0x00ff00,0x0000ff,0xffff00,0xff00ff,0x00ffff,0xffffff,0x888888];
+  return colors[Math.abs(hash)%colors.length];
 }
+const avatarGeo = new THREE.BoxGeometry(0.8,1.6,0.8);
+const avatarMat = new THREE.MeshLambertMaterial({color: generatePixelColor(walletAddress)});
+const player = new THREE.Mesh(avatarGeo, avatarMat);
+player.position.set(0,1,0);
+scene.add(player);
+
+// --- Block Placement ---
+const blockTypes = [
+  {name:"Grass", color:0x00ff00},
+  {name:"Stone", color:0x888888},
+  {name:"Dirt", color:0x8B4513},
+  {name:"Water", color:0x1E90FF},
+];
+let selectedBlock = 0;
+
+// --- Inventory UI ---
+const inventoryDiv = document.getElementById('inventory');
+blockTypes.forEach((b,i)=>{
+  const slot = document.createElement('div');
+  slot.classList.add('block-slot'); if(i===0) slot.classList.add('selected');
+  slot.style.backgroundColor = '#' + b.color.toString(16).padStart(6,'0');
+  slot.onclick=()=>{selectedBlock=i; document.querySelectorAll('.block-slot').forEach(s=>s.classList.remove('selected')); slot.classList.add('selected');}
+  inventoryDiv.appendChild(slot);
+});
+
+// --- Raycaster for block interaction ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function breakOrPlaceBlock(place){
+  raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+  const intersects = raycaster.intersectObjects(scene.children);
+  if(intersects.length>0){
+    const intersect = intersects[0];
+    if(place){
+      const cubeGeo = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+      const cubeMat = new THREE.MeshLambertMaterial({color:blockTypes[selectedBlock].color});
+      const cube = new THREE.Mesh(cubeGeo, cubeMat);
+      cube.position.copy(intersect.point).add(intersect.face.normal.multiplyScalar(0.5)).floor();
+      cube.position.x=Math.floor(cube.position.x)+0.5;
+      cube.position.y=Math.floor(cube.position.y)+0.5;
+      cube.position.z=Math.floor(cube.position.z)+0.5;
+      scene.add(cube);
+    } else {
+      if(intersect.object!==player) scene.remove(intersect.object);
+    }
+  }
+}
+document.addEventListener('mousedown', (e)=>{
+  if(e.button===0) breakOrPlaceBlock(false);
+  if(e.button===2) breakOrPlaceBlock(true);
+});
+document.addEventListener('contextmenu', e=>e.preventDefault());
+
+// --- Game loop ---
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  velocity.x -= velocity.x * 10.0 * delta;
+  velocity.z -= velocity.z * 10.0 * delta;
+  velocity.y -= 9.8 * 5 * delta;
+
+  direction.z = Number(moveForward)-Number(moveBackward);
+  direction.x = Number(moveRight)-Number(moveLeft);
+  direction.normalize();
+
+  if(moveForward||moveBackward) velocity.z -= direction.z*10*delta;
+  if(moveLeft||moveRight) velocity.x -= direction.x*10*delta;
+
+  controls.moveRight(-velocity.x*delta);
+  controls.moveForward(-velocity.z*delta);
+  controls.getObject().position.y += velocity.y*delta;
+
+  if(controls.getObject().position.y<1){ velocity.y=0; controls.getObject().position.y=1; canJump=true;}
+  player.position.copy(controls.getObject().position);
+  camera.position.copy(controls.getObject().position).add(new THREE.Vector3(0,0,0));
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', ()=>{camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);});
 </script>
 </body>
 </html>
